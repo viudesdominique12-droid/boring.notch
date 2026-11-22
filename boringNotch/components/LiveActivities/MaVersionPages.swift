@@ -36,7 +36,7 @@ enum NotchPage: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .music: return "music.note"
-        case .weather: return "location.fill"
+        case .weather: return "cloud.sun.fill"
         case .agenda: return "calendar"
         case .timer: return "timer"
         case .shortcuts: return "square.grid.2x2.fill"
@@ -124,10 +124,8 @@ struct MaVersionTopBar: View {
         .animation(.easeInOut(duration: 0.2), value: model.index)
     }
 
-    private var title: String {
-        if model.page == .weather, !weather.cityName.isEmpty { return weather.cityName }
-        return model.page.title
-    }
+    /// Short page names only: the space left of the camera is ~70 pt.
+    private var title: String { model.page.title }
 }
 
 struct MaVersionClosedStatus: View {

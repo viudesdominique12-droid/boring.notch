@@ -546,8 +546,8 @@ struct ContentView: View {
                            // ma-version: page title | camera | temperature + battery.
                            // Negative padding lets it use the panel's side margins.
                            MaVersionTopBar(notchWidth: vm.closedNotchSize.width)
-                               .frame(width: MaVersionMetrics.pageWidth + 52, height: displayClosedNotchHeight)
-                               .padding(.horizontal, -26)
+                               .frame(width: MaVersionMetrics.pageWidth + 36, height: displayClosedNotchHeight)
+                               .padding(.horizontal, -18)
                        }
                         // New case to enable compact notch on external displays
                         else if !vm.hasNotch {

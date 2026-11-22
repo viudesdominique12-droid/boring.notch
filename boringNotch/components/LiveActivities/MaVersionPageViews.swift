@@ -620,7 +620,7 @@ struct PagedTopBarContent: View {
         HStack(spacing: 0) {
             HStack(spacing: 5) {
                 Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
-                Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                Text(title).font(.system(size: 12, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
             }
             .foregroundStyle(.white.opacity(0.85))
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -636,9 +636,11 @@ struct PagedTopBarContent: View {
                             .font(.system(size: 11))
                         Text(temperature).font(.system(size: 12, weight: .semibold, design: .rounded))
                     }
+                    .fixedSize()
                 }
                 if let batteryLevel {
-                    BatteryGlyph(level: batteryLevel, isCharging: isCharging, showsPercent: true)
+                    BatteryGlyph(level: batteryLevel, isCharging: isCharging, showsPercent: false)
+                        .fixedSize()
                 }
             }
             .foregroundStyle(.white)
@@ -657,6 +659,8 @@ struct BatteryGlyph: View {
         HStack(spacing: 3) {
             if showsPercent {
                 Text("\(level)%").font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .fixedSize()
             }
             Image(systemName: symbolName)
                 .font(.system(size: 13))
@@ -803,7 +807,8 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
             guard axis == .horizontal else { return }
 
             // Content follows the fingers whatever the "natural scrolling" setting.
-            let fingerDX = dx * (event.isDirectionInvertedFromDevice ? 1 : -1)
+            // (Sign checked on the user's Mac: the first build was reversed.)
+            let fingerDX = dx * (event.isDirectionInvertedFromDevice ? -1 : 1)
             offset += fingerDX * (event.hasPreciseScrollingDeltas ? 1 : 10)
             onChanged(offset)
 
