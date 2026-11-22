@@ -43,6 +43,7 @@ jobs:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
+            ENABLE_HARDENED_RUNTIME=NO \
             ONLY_ACTIVE_ARCH=NO \
             | tee build.log | grep -E "error:|warning: .*glass|BUILD (SUCCEEDED|FAILED)" || true
           ls build/Build/Products/Release/
@@ -58,6 +59,7 @@ jobs:
           APP=$(ls -d *.app | head -1)
           echo "App: $APP"
           codesign -dv --entitlements - "$APP" 2>&1 | head -30 || true
+          codesign --verify --deep --strict --verbose=2 "$APP"
           ditto -c -k --keepParent "$APP" "$GITHUB_WORKSPACE/BoringNotch-ma-version.zip"
 
       - name: Upload
