@@ -716,6 +716,61 @@ struct ClosedStatusContent: View {
     }
 }
 
+/// Closed notch while a timer runs, like the iPhone's Dynamic Island:
+/// a progress ring left of the camera, the countdown on the right.
+struct TimerLiveActivityContent: View {
+    let mode: FocusMode
+    let remaining: TimeInterval
+    let total: TimeInterval
+    let isRunning: Bool
+    let finished: Bool
+    let notchWidth: CGFloat
+    let height: CGFloat
+
+    static let sideWidth: CGFloat = 58
+
+    private var progress: Double {
+        guard total > 0 else { return 0 }
+        return min(max(1 - remaining / total, 0), 1)
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ZStack {
+                Circle().stroke(mode.tint.opacity(0.25), lineWidth: 2.5)
+                Circle()
+                    .trim(from: 0, to: finished ? 1 : progress)
+                    .stroke(mode.tint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                if finished || !isRunning {
+                    Image(systemName: finished ? "checkmark" : "pause.fill")
+                        .font(.system(size: 7, weight: .black))
+                        .foregroundStyle(mode.tint)
+                }
+            }
+            .frame(width: 17, height: 17)
+            .animation(.linear(duration: 1), value: progress)
+            .frame(width: Self.sideWidth, alignment: .leading)
+            .padding(.leading, 2)
+
+            Rectangle().fill(.black).frame(width: notchWidth)
+
+            Text(finished ? "Fini" : TimerPageContent.clock(remaining))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(mode.tint)
+                .opacity(isRunning || finished ? 1 : 0.7)
+                .contentTransition(.numericText(countsDown: true))
+                .animation(.smooth(duration: 0.25), value: Int(remaining))
+                .lineLimit(1)
+                .fixedSize()
+                .frame(width: Self.sideWidth, alignment: .trailing)
+                .padding(.trailing, 2)
+        }
+        .frame(height: height, alignment: .center)
+    }
+}
+
 // MARK: - Horizontal two-finger swipe
 
 /// Reports horizontal trackpad scrolls on this view's window as a running

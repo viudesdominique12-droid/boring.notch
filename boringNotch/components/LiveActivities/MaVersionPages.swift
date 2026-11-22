@@ -148,6 +148,28 @@ struct MaVersionClosedStatus: View {
     }
 }
 
+// MARK: - Timer live activity (closed notch)
+
+struct MaVersionTimerActivity: View {
+    let notchWidth: CGFloat
+    let height: CGFloat
+    @ObservedObject private var timer = FocusTimer.shared
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            TimerLiveActivityContent(
+                mode: timer.finishedMode ?? timer.mode,
+                remaining: timer.remaining(at: context.date),
+                total: timer.total,
+                isRunning: timer.isRunning,
+                finished: timer.finishedMode != nil,
+                notchWidth: notchWidth,
+                height: height
+            )
+        }
+    }
+}
+
 // MARK: - Weather
 
 private struct WeatherPage: View {
@@ -230,8 +252,17 @@ final class FocusTimer: ObservableObject {
     @Published private(set) var endDate: Date?
     @Published private(set) var pausedRemaining: TimeInterval?
     @Published private(set) var total: TimeInterval = 25 * 60
+    /// Set when a countdown ends, cleared a few seconds later: the closed
+    /// notch shows "Fini" in the meantime.
+    @Published private(set) var finishedMode: FocusMode?
 
     private var completionTask: Task<Void, Never>?
+    private var finishedClearTask: Task<Void, Never>?
+
+    /// Whether the closed notch should show the timer, like a Live Activity.
+    var showsLiveActivity: Bool {
+        isRunning || pausedRemaining != nil || finishedMode != nil
+    }
 
     var isRunning: Bool { endDate != nil }
     var customMinutes: Int { Defaults[.focusCustomMinutes] }
@@ -249,6 +280,7 @@ final class FocusTimer: ObservableObject {
     }
 
     func toggle() {
+        clearFinished()
         if let endDate {
             pausedRemaining = max(0, endDate.timeIntervalSinceNow)
             self.endDate = nil
@@ -264,6 +296,12 @@ final class FocusTimer: ObservableObject {
     func reset() {
         cancel()
         pausedRemaining = nil
+        clearFinished()
+    }
+
+    private func clearFinished() {
+        finishedClearTask?.cancel()
+        finishedMode = nil
     }
 
     func adjustCustom(by minutes: Int) {
@@ -304,6 +342,13 @@ final class FocusTimer: ObservableObject {
         let finished = mode
         cancel()
         pausedRemaining = nil
+        finishedMode = finished
+        finishedClearTask?.cancel()
+        finishedClearTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled else { return }
+            self?.finishedMode = nil
+        }
         // Pomodoro rhythm: work → break → work. The next one waits for a tap.
         switch finished {
         case .focus: select(.shortBreak)

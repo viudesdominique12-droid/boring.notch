@@ -41,6 +41,7 @@ struct ContentView: View {
     @Default(.liquidGlassNotch) var liquidGlassNotch
     @Default(.liquidGlassTint) var liquidGlassTint
     @Default(.pagedLayout) var pagedLayout
+    @ObservedObject var focusTimer = FocusTimer.shared
     @Default(.closedNotchStatus) var closedNotchStatus
 
     /// ma-version: real Liquid Glass needs to see what's behind the window, so
@@ -141,6 +142,11 @@ struct ContentView: View {
 
         if let notification = notificationManager.activeNotification {
             items.append(.notification(notification))
+        }
+
+        // ma-version: a running timer sits in front of music, like iOS.
+        if focusTimer.showsLiveActivity {
+            items.append(.timer)
         }
 
         let musicIsShowing = (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
@@ -244,6 +250,8 @@ struct ContentView: View {
             switch activity {
             case .notification:
                 chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
+            case .timer:
+                chinWidth += 2 * (TimerLiveActivityContent.sideWidth + 2)
             case .music:
                 chinWidth += (2 * max(0, displayClosedNotchHeight - 12) + 20 + 2 * liveActivityEdgeMargin + 2)
                 // The inline song-change peek widens the pill itself, so the
@@ -408,6 +416,13 @@ struct ContentView: View {
                     // expires, music stops). Keep the selection in range so
                     // the stack falls back to whatever is left instead of
                     // pointing past the end.
+                    // ma-version: opening the notch from the timer activity
+                    // lands on the Minuteur page, like tapping a Live Activity.
+                    .onChange(of: vm.notchState) { _, state in
+                        if state == .open, pagedLayout, selectedActivity == .timer {
+                            NotchPageModel.shared.index = NotchPage.allCases.firstIndex(of: .timer) ?? 0
+                        }
+                    }
                     .onChange(of: liveActivities.count) { _, count in
                         if activityIndex >= count { activityIndex = max(count - 1, 0) }
                     }
@@ -540,6 +555,11 @@ struct ContentView: View {
                               switch item {
                               case .notification(let notification):
                                   NotificationLiveActivity(notification: notification)
+                              case .timer:
+                                  MaVersionTimerActivity(
+                                      notchWidth: vm.closedNotchSize.width,
+                                      height: displayClosedNotchHeight
+                                  )
                               case .music:
                                   MusicLiveActivity()
                                       .frame(alignment: .center)
