@@ -20,7 +20,9 @@ enum StandardAnimations {
         guard Defaults[.enableOpeningAnimation] else {
             return Animation.linear(duration: 0)
         }
-        return Animation.spring(response: 0.42 / Defaults[.animationSpeedMultiplier], dampingFraction: 0.8, blendDuration: 0)
+        // ma-version: a little overshoot, like the Dynamic Island.
+        let damping = Defaults[.bouncyOpen] ? 0.66 : 0.8
+        return Animation.spring(response: 0.42 / Defaults[.animationSpeedMultiplier], dampingFraction: damping, blendDuration: 0)
     }
 
     /// Spring animation for closing the notch

@@ -42,6 +42,16 @@ struct ContentView: View {
     @Default(.liquidGlassTint) var liquidGlassTint
     @Default(.pagedLayout) var pagedLayout
     @ObservedObject var focusTimer = FocusTimer.shared
+    @ObservedObject var glanceCenter = GlanceCenter.shared
+    @ObservedObject var upcomingEvents = UpcomingEventMonitor.shared
+    @Default(.iphoneChargingAnimation) var iphoneChargingAnimation
+    @Default(.albumGlow) var albumGlow
+
+    /// ma-version: album colour tints the glass while music plays.
+    private var glassGlow: NSColor? {
+        guard albumGlow, musicManager.isPlaying else { return nil }
+        return musicManager.avgColor
+    }
     @Default(.closedNotchStatus) var closedNotchStatus
 
     /// ma-version: real Liquid Glass needs to see what's behind the window, so
@@ -144,9 +154,16 @@ struct ContentView: View {
             items.append(.notification(notification))
         }
 
-        // ma-version: a running timer sits in front of music, like iOS.
+        // ma-version: short alerts first, then the timer and an imminent
+        // event — all in front of music, like iOS.
+        if glanceCenter.current != nil {
+            items.append(.glance)
+        }
         if focusTimer.showsLiveActivity {
             items.append(.timer)
+        }
+        if upcomingEvents.upcoming != nil {
+            items.append(.event)
         }
 
         let musicIsShowing = (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
@@ -241,7 +258,9 @@ struct ContentView: View {
             chinWidth = nowPlayingFallbackNoticeWidth
         } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
             && vm.notchState == .closed && Defaults[.showPowerStatusNotifications] {
-            chinWidth = 640
+            chinWidth = iphoneChargingAnimation
+                ? vm.closedNotchSize.width + 2 * (ChargingActivityContent.side + 2)
+                : 640
         } else if vm.notchState == .closed, !vm.hideOnClosed, let activity = selectedActivity {
             // Sized for whichever activity is actually on top, not for
             // whichever happens to exist — otherwise swiping to music while a
@@ -252,6 +271,10 @@ struct ContentView: View {
                 chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
             case .timer:
                 chinWidth += 2 * (TimerLiveActivityContent.sideWidth + 2)
+            case .glance:
+                chinWidth += 2 * (GlanceActivityContent.side + 2)
+            case .event:
+                chinWidth += 2 * (EventActivityContent.side + 2)
             case .music:
                 chinWidth += (2 * max(0, displayClosedNotchHeight - 12) + 20 + 2 * liveActivityEdgeMargin + 2)
                 // The inline song-change peek widens the pill itself, so the
@@ -334,7 +357,8 @@ struct ContentView: View {
                             NativeGlassBackground(
                                 cornerRadius: openedInsets.bottom,
                                 horizontalInset: openedInsets.top,
-                                tint: liquidGlassTint
+                                tint: liquidGlassTint,
+                                glow: glassGlow
                             )
                         }
                     }
@@ -419,10 +443,15 @@ struct ContentView: View {
                     // ma-version: opening the notch from the timer activity
                     // lands on the Minuteur page, like tapping a Live Activity.
                     .onChange(of: vm.notchState) { _, state in
-                        if state == .open, pagedLayout, selectedActivity == .timer {
-                            NotchPageModel.shared.index = NotchPage.allCases.firstIndex(of: .timer) ?? 0
+                        guard state == .open, pagedLayout else { return }
+                        var page: NotchPage?
+                        if selectedActivity == .timer { page = .timer }
+                        if selectedActivity == .event { page = .agenda }
+                        if let page {
+                            NotchPageModel.shared.index = NotchPage.allCases.firstIndex(of: page) ?? 0
                         }
                     }
+                    .onAppear { MaVersionMonitors.startAll() }
                     .onChange(of: liveActivities.count) { _, count in
                         if activityIndex >= count { activityIndex = max(count - 1, 0) }
                     }
@@ -470,6 +499,9 @@ struct ContentView: View {
                 if Defaults[.boringShelf] && vm.notchState == .closed {
                     if doOpen() {
                         coordinator.currentView = .shelf
+                        if pagedLayout {
+                            NotchPageModel.shared.index = NotchPage.allCases.firstIndex(of: .files) ?? 0
+                        }
                     }
                 }
                 return
@@ -515,6 +547,13 @@ struct ContentView: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
                     } else if coordinator.expandingView.type == .battery && coordinator.expandingView.show
                         && vm.notchState == .closed && Defaults[.showPowerStatusNotifications] {
+                        if iphoneChargingAnimation {
+                            MaVersionChargingActivity(
+                                notchWidth: vm.closedNotchSize.width,
+                                height: displayClosedNotchHeight
+                            )
+                            .transition(.scale(scale: 0.9).combined(with: .opacity))
+                        } else {
                         HStack(spacing: 0) {
                             HStack {
                                 Text(batteryModel.statusText)
@@ -540,6 +579,7 @@ struct ContentView: View {
                             .frame(width: 76, alignment: .trailing)
                         }
                         .frame(height: displayClosedNotchHeight, alignment: .center)
+                        }
                         } else if coordinator.shouldShowSneakPeek(on: vm.screenUUID) && Defaults[.inlineOSD] && (coordinator.sneakPeekState(for: vm.screenUUID).type != .music) && (coordinator.sneakPeekState(for: vm.screenUUID).type != .battery) && vm.notchState == .closed {
                            InlineOSD(
                               type: coordinator.binding(for: vm.screenUUID).type,
@@ -557,6 +597,16 @@ struct ContentView: View {
                                   NotificationLiveActivity(notification: notification)
                               case .timer:
                                   MaVersionTimerActivity(
+                                      notchWidth: vm.closedNotchSize.width,
+                                      height: displayClosedNotchHeight
+                                  )
+                              case .glance:
+                                  MaVersionGlanceActivity(
+                                      notchWidth: vm.closedNotchSize.width,
+                                      height: displayClosedNotchHeight
+                                  )
+                              case .event:
+                                  MaVersionEventActivity(
                                       notchWidth: vm.closedNotchSize.width,
                                       height: displayClosedNotchHeight
                                   )

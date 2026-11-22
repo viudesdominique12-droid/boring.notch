@@ -34,7 +34,34 @@ struct MaVersionSettingsView: View {
             } header: {
                 Text("Agencement")
             } footer: {
-                Text("Glisse à deux doigts sur l'encoche ouverte : Musique → Météo → Agenda → Minuteur → Apps. Tu peux aussi cliquer sur les petits points.")
+                Text("Glisse à deux doigts sur l'encoche ouverte : Musique → Météo → Agenda → Minuteur → Fichiers → Copies → Apps. Tu peux aussi cliquer sur les petits points.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Defaults.Toggle(key: .bouncyOpen) { Text("Ouverture avec rebond") }
+                Defaults.Toggle(key: .iphoneChargingAnimation) { Text("Animation de charge façon iPhone") }
+                Defaults.Toggle(key: .albumGlow) { Text("Lueur de la pochette dans le verre") }
+                Defaults.Toggle(key: .pageDepthEffect) { Text("Effet de profondeur entre les pages") }
+                Defaults.Toggle(key: .pageHaptics) { Text("Petit clic au trackpad à chaque page") }
+            } header: {
+                Text("Animations")
+            }
+
+            Section {
+                Defaults.Toggle(key: .upcomingEventAlert) { Text("Rendez-vous dans moins de 10 min") }
+                Defaults.Toggle(key: .rainAlert) { Text("Pluie qui arrive (dans 20 min ou moins)") }
+                Defaults.Toggle(key: .deviceAlert) { Text("Écouteurs Bluetooth connectés, avec batterie") }
+            } header: {
+                Text("Alertes dans l'encoche fermée")
+            }
+
+            Section {
+                Defaults.Toggle(key: .clipboardHistory) { Text("Garder l'historique des textes copiés") }
+            } header: {
+                Text("Page Copies")
+            } footer: {
+                Text("Les 10 derniers textes copiés, gardés en mémoire seulement : rien n'est enregistré sur le disque, et les mots de passe copiés depuis un gestionnaire sont ignorés.")
                     .foregroundStyle(.secondary)
             }
 

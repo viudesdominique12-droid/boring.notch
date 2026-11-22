@@ -523,6 +523,18 @@ extension Defaults.Keys {
         default: ["com.apple.Safari", "com.apple.MobileSMS", "com.apple.Notes", "com.apple.finder"]
     )
     static let focusCustomMinutes = Key<Int>("focusCustomMinutes", default: 10)
+    // Animations
+    static let bouncyOpen = Key<Bool>("bouncyOpen", default: true)
+    static let iphoneChargingAnimation = Key<Bool>("iphoneChargingAnimation", default: true)
+    static let albumGlow = Key<Bool>("albumGlow", default: true)
+    static let pageDepthEffect = Key<Bool>("pageDepthEffect", default: true)
+    static let pageHaptics = Key<Bool>("pageHaptics", default: true)
+    // Closed-notch glances
+    static let upcomingEventAlert = Key<Bool>("upcomingEventAlert", default: true)
+    static let rainAlert = Key<Bool>("rainAlert", default: true)
+    static let deviceAlert = Key<Bool>("deviceAlert", default: true)
+    // Clipboard page (kept in memory only)
+    static let clipboardHistory = Key<Bool>("clipboardHistory", default: true)
     /// Liquid Glass background for the opened notch (macOS 26+). Closed notch stays black.
     static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
     /// How much black is mixed into the glass, so white text stays readable.

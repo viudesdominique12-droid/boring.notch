@@ -24,12 +24,18 @@ enum LiveActivityItem: Identifiable, Equatable {
     case notification(SystemNotification)
     /// ma-version: running / paused / just-finished focus timer.
     case timer
+    /// ma-version: short alert (rain coming, headphones connected).
+    case glance
+    /// ma-version: calendar event starting within 10 minutes.
+    case event
     case music
 
     var id: String {
         switch self {
         case .notification(let notification): "notification-\(notification.id)"
         case .timer: "timer"
+        case .glance: "glance"
+        case .event: "event"
         case .music: "music"
         }
     }

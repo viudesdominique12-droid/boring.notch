@@ -771,6 +771,285 @@ struct TimerLiveActivityContent: View {
     }
 }
 
+// MARK: - Closed-notch glances (iPhone-style)
+
+/// Shared layout for the closed notch: something left of the camera,
+/// something right of it. Sides are fixed so the chin width is known.
+struct ClosedSides<Leading: View, Trailing: View>: View {
+    let notchWidth: CGFloat
+    let height: CGFloat
+    let side: CGFloat
+    @ViewBuilder let leading: () -> Leading
+    @ViewBuilder let trailing: () -> Trailing
+
+    var body: some View {
+        HStack(spacing: 0) {
+            leading()
+                .frame(width: side, alignment: .leading)
+                .padding(.leading, 2)
+            Rectangle().fill(.black).frame(width: notchWidth)
+            trailing()
+                .frame(width: side, alignment: .trailing)
+                .padding(.trailing, 2)
+        }
+        .frame(height: height, alignment: .center)
+    }
+}
+
+/// Plugging in the charger, like iOS: green bolt + "En charge", level right.
+struct ChargingActivityContent: View {
+    let level: Int
+    let isCharging: Bool
+    let notchWidth: CGFloat
+    let height: CGFloat
+    static let side: CGFloat = 96
+
+    @State private var bolt = false
+
+    var body: some View {
+        ClosedSides(notchWidth: notchWidth, height: height, side: Self.side) {
+            HStack(spacing: 5) {
+                Image(systemName: isCharging ? "bolt.fill" : "powerplug.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(isCharging ? Color.green : Color.white)
+                    .symbolEffect(.bounce, value: bolt)
+                Text(isCharging ? "En charge" : "Sur batterie")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+        } trailing: {
+            HStack(spacing: 4) {
+                Text("\(level)%")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isCharging ? Color.green : Color.white)
+                    .fixedSize()
+                ChargingBattery(level: level, isCharging: isCharging)
+            }
+        }
+        .onAppear { bolt.toggle() }
+    }
+}
+
+/// Battery outline whose fill sweeps up to the level when it appears.
+struct ChargingBattery: View {
+    let level: Int
+    let isCharging: Bool
+    @State private var shown: CGFloat = 0
+
+    var body: some View {
+        HStack(spacing: 1) {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 3.5).stroke(.white.opacity(0.5), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(isCharging ? Color.green : (level <= 20 ? Color.red : Color.white))
+                    .frame(width: max(2, 19 * shown))
+                    .padding(1.5)
+            }
+            .frame(width: 24, height: 12)
+            RoundedRectangle(cornerRadius: 1).fill(.white.opacity(0.5)).frame(width: 1.5, height: 4)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.9, dampingFraction: 0.8).delay(0.1)) {
+                shown = CGFloat(min(max(level, 0), 100)) / 100
+            }
+        }
+    }
+}
+
+/// An event about to start: calendar colour + title left, countdown right.
+struct EventActivityContent: View {
+    let title: String
+    let color: Color
+    let start: Date
+    let now: Date
+    let notchWidth: CGFloat
+    let height: CGFloat
+    static let side: CGFloat = 104
+
+    var body: some View {
+        ClosedSides(notchWidth: notchWidth, height: height, side: Self.side) {
+            HStack(spacing: 5) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(color)
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        } trailing: {
+            Text(countdown)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .fixedSize()
+        }
+    }
+
+    private var countdown: String {
+        let minutes = Int((start.timeIntervalSince(now) / 60).rounded(.up))
+        if minutes <= 0 { return "Maintenant" }
+        return "dans \(minutes) min"
+    }
+}
+
+/// Short-lived alerts (rain coming, headphones connected).
+enum GlanceKind: Equatable {
+    case rain(start: Date)
+    case device(name: String, symbol: String, battery: Int?)
+}
+
+struct GlanceActivityContent: View {
+    let kind: GlanceKind
+    let now: Date
+    let notchWidth: CGFloat
+    let height: CGFloat
+    static let side: CGFloat = 96
+
+    @State private var pop = false
+
+    var body: some View {
+        ClosedSides(notchWidth: notchWidth, height: height, side: Self.side) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .symbolEffect(.bounce, value: pop)
+                Text(leftText)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        } trailing: {
+            Text(rightText)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .onAppear { pop.toggle() }
+    }
+
+    private var icon: String {
+        switch kind {
+        case .rain: return "umbrella.fill"
+        case .device(_, let symbol, _): return symbol
+        }
+    }
+
+    private var tint: Color {
+        switch kind {
+        case .rain: return Color(red: 0.45, green: 0.72, blue: 1.0)
+        case .device(_, _, let battery):
+            if let battery, battery <= 20 { return .red }
+            return .white
+        }
+    }
+
+    private var leftText: String {
+        switch kind {
+        case .rain: return "Pluie"
+        case .device(let name, _, _): return name
+        }
+    }
+
+    private var rightText: String {
+        switch kind {
+        case .rain(let start):
+            let minutes = Int((start.timeIntervalSince(now) / 60).rounded())
+            return minutes <= 1 ? "imminente" : "dans \(minutes) min"
+        case .device(_, _, let battery):
+            if let battery { return "\(battery)%" }
+            return "Connecté"
+        }
+    }
+}
+
+// MARK: - Clipboard page
+
+struct ClipboardEntry: Identifiable, Equatable {
+    let id: UUID
+    let text: String
+    let date: Date
+}
+
+struct ClipboardPageContent: View {
+    let entries: [ClipboardEntry]
+    let enabled: Bool
+    var now: Date = Date()
+    var onCopy: (ClipboardEntry) -> Void = { _ in }
+    var onClear: () -> Void = {}
+
+    @State private var copiedID: UUID?
+
+    var body: some View {
+        Group {
+            if !enabled {
+                PageMessage(icon: "clipboard", title: "Historique désactivé",
+                            subtitle: "Active-le dans Réglages → Ma version")
+            } else if entries.isEmpty {
+                PageMessage(icon: "doc.on.clipboard", title: "Rien de copié",
+                            subtitle: "Les textes que tu copies apparaîtront ici")
+            } else {
+                VStack(spacing: 4) {
+                    ForEach(entries.prefix(4)) { entry in
+                        Button {
+                            onCopy(entry)
+                            copiedID = entry.id
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: copiedID == entry.id ? "checkmark.circle.fill" : "doc.on.doc")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(copiedID == entry.id ? Color.green : .white.opacity(0.55))
+                                    .frame(width: 14)
+                                Text(entry.text.replacingOccurrences(of: "\n", with: " "))
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Spacer(minLength: 6)
+                                Text(Self.ago(entry.date, now: now))
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.45))
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(height: 25)
+                            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.white.opacity(0.06)))
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    HStack {
+                        Spacer()
+                        Button(action: onClear) {
+                            Text("Effacer")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.5))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
+            }
+        }
+        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight, alignment: .top)
+    }
+
+    static func ago(_ date: Date, now: Date) -> String {
+        let s = Int(now.timeIntervalSince(date))
+        if s < 60 { return "à l'instant" }
+        if s < 3600 { return "\(s / 60) min" }
+        return "\(s / 3600) h"
+    }
+}
+
 // MARK: - Horizontal two-finger swipe
 
 /// Reports horizontal trackpad scrolls on this view's window as a running
@@ -910,6 +1189,8 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
 struct SwipePager<Page: View>: View {
     let count: Int
     @Binding var index: Int
+    var depthEffect: Bool = false
+    var haptics: Bool = false
     @ViewBuilder let page: (Int) -> Page
 
     @State private var drag: CGFloat = 0
@@ -919,8 +1200,11 @@ struct SwipePager<Page: View>: View {
         VStack(spacing: 6) {
             HStack(spacing: 0) {
                 ForEach(0..<count, id: \.self) { i in
+                    let distance = depthEffect ? min(abs(CGFloat(i - index) - drag / width), 1) : 0
                     page(i)
                         .frame(width: width, height: MaVersionMetrics.pageHeight)
+                        .scaleEffect(1 - 0.08 * distance)
+                        .opacity(1 - 0.45 * Double(distance))
                         .allowsHitTesting(i == index)
                 }
             }
@@ -940,6 +1224,7 @@ struct SwipePager<Page: View>: View {
                         var target = index
                         if goNext { target = min(index + 1, count - 1) }
                         if goBack { target = max(index - 1, 0) }
+                        if target != index { tick() }
                         withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
                             index = target
                             drag = 0
@@ -949,9 +1234,16 @@ struct SwipePager<Page: View>: View {
             )
 
             PageDots(count: count, index: index) { i in
+                if i != index { tick() }
                 withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) { index = i }
             }
         }
+    }
+
+    /// A light click on the trackpad, like a detent.
+    private func tick() {
+        guard haptics else { return }
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }
 
     private func rubberBand(_ offset: CGFloat) -> CGFloat {

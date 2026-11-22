@@ -20,13 +20,15 @@ struct NativeGlassBackground: NSViewRepresentable {
     var cornerRadius: CGFloat
     var horizontalInset: CGFloat
     var tint: Double
+    /// Album colour while music plays (soft glow through the glass).
+    var glow: NSColor? = nil
 
     func makeNSView(context: Context) -> NativeGlassContainer {
         NativeGlassContainer()
     }
 
     func updateNSView(_ view: NativeGlassContainer, context: Context) {
-        view.configure(cornerRadius: cornerRadius, horizontalInset: horizontalInset, tint: tint)
+        view.configure(cornerRadius: cornerRadius, horizontalInset: horizontalInset, tint: tint, glow: glow)
     }
 }
 
@@ -55,12 +57,16 @@ final class NativeGlassContainer: NSView {
     // Purely decorative: never steal clicks or scrolls from the notch content.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    func configure(cornerRadius: CGFloat, horizontalInset: CGFloat, tint: Double) {
+    func configure(cornerRadius: CGFloat, horizontalInset: CGFloat, tint: Double, glow: NSColor?) {
         self.cornerRadius = cornerRadius
         self.horizontalInset = horizontalInset
         if #available(macOS 26.0, *), let glass = glass as? NSGlassEffectView {
             glass.cornerRadius = cornerRadius
-            glass.tintColor = tint > 0.02 ? NSColor.black.withAlphaComponent(tint) : nil
+            if let glow {
+                glass.tintColor = glow.withAlphaComponent(0.32)
+            } else {
+                glass.tintColor = tint > 0.02 ? NSColor.black.withAlphaComponent(tint) : nil
+            }
         } else {
             glass.layer?.cornerRadius = cornerRadius
             glass.layer?.masksToBounds = true

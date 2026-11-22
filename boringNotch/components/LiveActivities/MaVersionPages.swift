@@ -19,6 +19,8 @@ enum NotchPage: String, CaseIterable, Identifiable {
     case weather
     case agenda
     case timer
+    case files
+    case clipboard
     case shortcuts
 
     var id: String { rawValue }
@@ -29,6 +31,8 @@ enum NotchPage: String, CaseIterable, Identifiable {
         case .weather: return "Météo"
         case .agenda: return "Agenda"
         case .timer: return "Minuteur"
+        case .files: return "Fichiers"
+        case .clipboard: return "Copies"
         case .shortcuts: return "Apps"
         }
     }
@@ -39,6 +43,8 @@ enum NotchPage: String, CaseIterable, Identifiable {
         case .weather: return "cloud.sun.fill"
         case .agenda: return "calendar"
         case .timer: return "timer"
+        case .files: return "tray.and.arrow.down.fill"
+        case .clipboard: return "doc.on.clipboard"
         case .shortcuts: return "square.grid.2x2.fill"
         }
     }
@@ -76,10 +82,18 @@ final class NotchPageModel: ObservableObject {
 struct MaVersionPagesView: View {
     let albumArtNamespace: Namespace.ID
     let horizontalMediaGestureFeedback: CGFloat
+    @EnvironmentObject private var vm: BoringViewModel
     @ObservedObject private var model = NotchPageModel.shared
+    @Default(.pageDepthEffect) private var depthEffect
+    @Default(.pageHaptics) private var haptics
 
     var body: some View {
-        SwipePager(count: NotchPage.allCases.count, index: $model.index) { i in
+        SwipePager(
+            count: NotchPage.allCases.count,
+            index: $model.index,
+            depthEffect: depthEffect,
+            haptics: haptics
+        ) { i in
             switch NotchPage.allCases[i] {
             case .music:
                 CompactHomeView(
@@ -93,6 +107,12 @@ struct MaVersionPagesView: View {
                 AgendaPage()
             case .timer:
                 TimerPage()
+            case .files:
+                ShelfView(dropInteraction: vm.dropInteraction, animation: vm.animation)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 8)
+            case .clipboard:
+                ClipboardPage()
             case .shortcuts:
                 ShortcutsPage()
             }
@@ -145,6 +165,56 @@ struct MaVersionClosedStatus: View {
             height: height
         )
         .onAppear { weather.refreshIfNeeded() }
+    }
+}
+
+// MARK: - Closed-notch glances
+
+struct MaVersionChargingActivity: View {
+    let notchWidth: CGFloat
+    let height: CGFloat
+    @ObservedObject private var battery = BatteryStatusViewModel.shared
+
+    var body: some View {
+        ChargingActivityContent(
+            level: Int(battery.levelBattery.rounded()),
+            isCharging: battery.isCharging || battery.isPluggedIn,
+            notchWidth: notchWidth,
+            height: height
+        )
+    }
+}
+
+struct MaVersionEventActivity: View {
+    let notchWidth: CGFloat
+    let height: CGFloat
+    @ObservedObject private var monitor = UpcomingEventMonitor.shared
+
+    var body: some View {
+        if let event = monitor.upcoming {
+            TimelineView(.periodic(from: .now, by: 15)) { context in
+                EventActivityContent(
+                    title: event.title,
+                    color: Color(nsColor: event.color),
+                    start: event.start,
+                    now: context.date,
+                    notchWidth: notchWidth,
+                    height: height
+                )
+            }
+        }
+    }
+}
+
+struct MaVersionGlanceActivity: View {
+    let notchWidth: CGFloat
+    let height: CGFloat
+    @ObservedObject private var center = GlanceCenter.shared
+
+    var body: some View {
+        if let kind = center.current {
+            GlanceActivityContent(kind: kind, now: Date(), notchWidth: notchWidth, height: height)
+        }
     }
 }
 
@@ -373,6 +443,25 @@ private struct TimerPage: View {
                 onReset: { timer.reset() },
                 onSelect: { timer.select($0) },
                 onAdjustCustom: { timer.adjustCustom(by: $0) }
+            )
+        }
+    }
+}
+
+// MARK: - Clipboard
+
+private struct ClipboardPage: View {
+    @ObservedObject private var history = ClipboardHistory.shared
+    @Default(.clipboardHistory) private var enabled
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            ClipboardPageContent(
+                entries: history.entries,
+                enabled: enabled,
+                now: context.date,
+                onCopy: { history.copy($0) },
+                onClear: { history.clear() }
             )
         }
     }
