@@ -10,6 +10,7 @@ import SwiftUI
 import SwiftUIIntrospect
 
 private enum SettingsTab: String, CaseIterable, Identifiable {
+    case maVersion
     case general
     case notch
     case appearance
@@ -32,6 +33,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
 
     var title: LocalizedStringKey {
         switch self {
+        case .maVersion: "Ma version"
         case .general: "General"
         case .notch: "Notch"
         case .appearance: "Appearance"
@@ -49,6 +51,7 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
 
     var icon: Icon {
         switch self {
+        case .maVersion: .system("sparkles")
         case .general: .system("gear")
         case .notch: .custom("notch")
         case .appearance: .system("paintbrush")
@@ -91,6 +94,8 @@ struct SettingsView: View {
         } detail: {
             Group {
                 switch selectedTab {
+                case .maVersion:
+                    MaVersionSettingsView()
                 case .general:
                     GeneralSettings()
                 case .notch:

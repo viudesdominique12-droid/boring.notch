@@ -506,6 +506,18 @@ extension Defaults.Keys {
     /// layout they already have.
     static let compactMode = Key<Bool>("compactMode", default: false)
 
+    // MARK: Ma version (custom fork)
+    /// Weather card in the open notch, fed by Open-Meteo (no account, no key).
+    static let showWeather = Key<Bool>("showWeather", default: true)
+    /// City typed by the user in Settings → Ma version. Empty until they set it.
+    static let weatherCity = Key<String>("weatherCity", default: "")
+    /// Shrinks the home-view music player to a small art + 3 transport buttons.
+    static let smallMediaPlayer = Key<Bool>("smallMediaPlayer", default: true)
+    /// Liquid Glass background for the opened notch (macOS 26+). Closed notch stays black.
+    static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
+    /// How much black is mixed into the glass, so white text stays readable.
+    static let liquidGlassTint = Key<Double>("liquidGlassTint", default: 0.35)
+
     // MARK: Notifications
     /// Off by default: mirroring banners needs Accessibility access.
     static let notificationLiveActivity = Key<Bool>("notificationLiveActivity", default: false)
