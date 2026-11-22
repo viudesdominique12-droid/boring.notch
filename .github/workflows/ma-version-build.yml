@@ -1,0 +1,68 @@
+name: "Build ma-version"
+on:
+  push:
+    branches: [ma-version]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ma-version
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          XCODE=$(ls -d /Applications/Xcode_*.app | grep -v -i beta | sort -V | tail -1)
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i macosx
+
+      - name: Resolve Swift packages
+        run: xcodebuild -resolvePackageDependencies -project boringNotch.xcodeproj -scheme boringNotch
+
+      - name: Build (ad-hoc signed, no Apple account)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project boringNotch.xcodeproj \
+            -scheme boringNotch \
+            -configuration Release \
+            -destination "generic/platform=macOS" \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            ONLY_ACTIVE_ARCH=NO \
+            | tee build.log | grep -E "error:|warning: .*glass|BUILD (SUCCEEDED|FAILED)" || true
+          ls build/Build/Products/Release/
+          test -n "$(ls -d build/Build/Products/Release/*.app)"
+
+      - name: Show errors if build failed
+        if: failure()
+        run: grep -n -B2 -A6 "error:" build.log | head -200 || true
+
+      - name: Package app
+        run: |
+          cd build/Build/Products/Release
+          APP=$(ls -d *.app | head -1)
+          echo "App: $APP"
+          codesign -dv --entitlements - "$APP" 2>&1 | head -30 || true
+          ditto -c -k --keepParent "$APP" "$GITHUB_WORKSPACE/BoringNotch-ma-version.zip"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: BoringNotch-ma-version
+          path: BoringNotch-ma-version.zip
+          retention-days: 14

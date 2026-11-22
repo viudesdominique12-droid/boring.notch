@@ -80,7 +80,8 @@ struct DynamicNotchApp: App {
                 }
                 NSLog("Failed to migrate legacy Boring Notch app bundle at %@", sourceURL.path)
             }
-            updaterController.startUpdater()
+            // ma-version: official auto-updates are off so they don't overwrite this custom build.
+            // updaterController.startUpdater()
         }
     }
 
