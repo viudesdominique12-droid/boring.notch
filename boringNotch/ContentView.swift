@@ -107,22 +107,10 @@ struct ContentView: View {
         return max(0, baseClosedTop * scaleFactor)
     }
 
-    /// ma-version: Liquid Glass behind the opened notch (macOS 26+).
-    /// The closed notch stays solid black so it still blends into the
-    /// hardware cutout.
-    @ViewBuilder
-    private var notchBackground: some View {
-        if #available(macOS 26.0, *), liquidGlassNotch, vm.notchState == .open {
-            // Same material as Control Center: plain .regular glass in dark
-            // appearance (the notch window is darkAqua). Tint only if asked.
-            Color.clear
-                .glassEffect(
-                    .regular.tint(liquidGlassTint > 0.02 ? Color.black.opacity(liquidGlassTint) : nil),
-                    in: currentNotchShape
-                )
-        } else {
-            Color.black
-        }
+    /// ma-version: native Liquid Glass (NSGlassEffectView) behind the open
+    /// notch. The closed notch stays solid black to blend with the camera.
+    private var showsNativeGlass: Bool {
+        glassEnabled && vm.notchState == .open
     }
 
     private var currentNotchShape: NotchShape {
@@ -319,8 +307,21 @@ struct ContentView: View {
                         vm.notchState == .open ? openedInsets.top : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                    .background { notchBackground }
+                    .background {
+                        if !showsNativeGlass { Color.black }
+                    }
                     .clipShape(currentNotchShape)
+                    // Outside the clip on purpose: the glass draws its own
+                    // rounded edge and rim light, a mask would cut them off.
+                    .background {
+                        if showsNativeGlass {
+                            NativeGlassBackground(
+                                cornerRadius: openedInsets.bottom,
+                                horizontalInset: openedInsets.top,
+                                tint: liquidGlassTint
+                            )
+                        }
+                    }
                           .overlay(alignment: .top) {
                               displayClosedNotchHeight.isZero && vm.notchState == .closed ? nil
                         : Rectangle()

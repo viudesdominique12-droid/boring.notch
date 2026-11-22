@@ -81,7 +81,7 @@ struct MaVersionSettingsView: View {
             }
 
             Section {
-                Toggle("Effet Liquid Glass (en cours d'amélioration)", isOn: $liquidGlassNotch)
+                Toggle("Verre Liquid Glass d'Apple (encoche ouverte)", isOn: $liquidGlassNotch)
                 if liquidGlassNotch {
                     HStack {
                         Text("Assombrissement")

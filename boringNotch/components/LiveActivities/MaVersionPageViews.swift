@@ -719,11 +719,15 @@ struct ClosedStatusContent: View {
 // MARK: - Horizontal two-finger swipe
 
 /// Reports horizontal trackpad scrolls on this view's window as a running
-/// finger offset, then the final offset when the fingers lift. Momentum
-/// events are ignored so one swipe = one page.
+/// finger offset, then the final offset and last velocity when the fingers
+/// lift. Once a swipe is recognised as horizontal its events are consumed,
+/// so no other notch gesture (open/close, media skip) reacts to it, and its
+/// momentum is swallowed so one swipe = one page.
+/// Approach inspired by Sapphire's NotchSwipeRow (latch + consume); code is
+/// our own.
 struct HorizontalSwipeMonitor: NSViewRepresentable {
     var onChanged: (CGFloat) -> Void
-    var onEnded: (CGFloat) -> Void
+    var onEnded: (_ offset: CGFloat, _ velocity: CGFloat) -> Void
 
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
@@ -746,15 +750,17 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
 
     @MainActor final class Coordinator: NSObject {
         var onChanged: (CGFloat) -> Void
-        var onEnded: (CGFloat) -> Void
+        var onEnded: (CGFloat, CGFloat) -> Void
         private var monitor: Any?
+        private var active = false
         private var offset: CGFloat = 0
-        private var axis: Axis?
+        private var velocity: CGFloat = 0
+        private var sumX: CGFloat = 0
+        private var sumY: CGFloat = 0
+        private var swallowingMomentum = false
         private var endTask: Task<Void, Never>?
 
-        private enum Axis { case horizontal, vertical }
-
-        init(onChanged: @escaping (CGFloat) -> Void, onEnded: @escaping (CGFloat) -> Void) {
+        init(onChanged: @escaping (CGFloat) -> Void, onEnded: @escaping (CGFloat, CGFloat) -> Void) {
             self.onChanged = onChanged
             self.onEnded = onEnded
         }
@@ -763,8 +769,7 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
             remove()
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self, weak view] event in
                 guard let self, let view, event.window === view.window else { return event }
-                self.handle(event)
-                return event
+                return self.handle(event)
             }
         }
 
@@ -776,43 +781,62 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
         }
 
         private func reset() {
+            active = false
             offset = 0
-            axis = nil
+            velocity = 0
+            sumX = 0
+            sumY = 0
         }
 
         private func finish() {
             endTask?.cancel()
-            if axis == .horizontal { onEnded(offset) }
+            if active {
+                NSLog("[MaVersionSwipe] end offset=%.1f velocity=%.1f", offset, velocity)
+                onEnded(offset, velocity)
+            }
             reset()
         }
 
-        private func handle(_ event: NSEvent) {
-            // Momentum after the fingers lift would flip several pages.
-            if event.momentumPhase != [] { return }
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            // Momentum after the fingers lift: swallow it if the swipe was ours.
+            if event.momentumPhase != [] {
+                guard swallowingMomentum else { return event }
+                if event.momentumPhase.contains(.ended) || event.momentumPhase.contains(.cancelled) {
+                    swallowingMomentum = false
+                }
+                return nil
+            }
 
-            if event.phase.contains(.began) || event.phase.contains(.mayBegin) {
+            if event.phase.contains(.mayBegin) || event.phase.contains(.began) {
                 reset()
+                swallowingMomentum = false
             }
             if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
+                let wasOurs = active
                 finish()
-                return
+                if wasOurs { swallowingMomentum = true }
+                return wasOurs ? nil : event
             }
 
             let dx = event.scrollingDeltaX
             let dy = event.scrollingDeltaY
-            if axis == nil {
-                guard abs(dx) > 0.5 || abs(dy) > 0.5 else { return }
-                axis = abs(dx) > 1.5 * abs(dy) ? .horizontal : .vertical
+            if !active {
+                // Don't decide on the first jittery event: wait for a few
+                // points of travel, and a vertical start doesn't lock us out.
+                sumX += abs(dx)
+                sumY += abs(dy)
+                guard sumX >= 4, sumX > sumY * 1.2 else { return event }
+                active = true
             }
-            guard axis == .horizontal else { return }
 
-            // Content follows the fingers whatever the "natural scrolling" setting.
-            // (Sign checked on the user's Mac: the first build was reversed.)
+            // Content follows the fingers. Sign checked on the user's Mac.
             let fingerDX = dx * (event.isDirectionInvertedFromDevice ? -1 : 1)
-            offset += fingerDX * (event.hasPreciseScrollingDeltas ? 1 : 10)
+                * (event.hasPreciseScrollingDeltas ? 1 : 10)
+            offset += fingerDX
+            velocity = fingerDX
             onChanged(offset)
 
-            // Mice and some devices send no phases: end after a short pause.
+            // Mice send no phases: end after a short pause.
             if event.phase == [] {
                 endTask?.cancel()
                 endTask = Task { @MainActor [weak self] in
@@ -821,6 +845,7 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
                     self?.finish()
                 }
             }
+            return nil
         }
     }
 }
@@ -853,10 +878,13 @@ struct SwipePager<Page: View>: View {
                     onChanged: { offset in
                         drag = rubberBand(offset)
                     },
-                    onEnded: { offset in
+                    onEnded: { offset, velocity in
+                        // Far enough, or a short quick flick, turns one page.
+                        let goNext = offset < -40 || (offset < -12 && velocity < -3)
+                        let goBack = offset > 40 || (offset > 12 && velocity > 3)
                         var target = index
-                        if offset < -width * 0.18 { target = min(index + 1, count - 1) }
-                        if offset > width * 0.18 { target = max(index - 1, 0) }
+                        if goNext { target = min(index + 1, count - 1) }
+                        if goBack { target = max(index - 1, 0) }
                         withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
                             index = target
                             drag = 0
