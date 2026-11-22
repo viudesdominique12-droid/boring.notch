@@ -842,7 +842,6 @@ struct SwipePager<Page: View>: View {
                     page(i)
                         .frame(width: width, height: MaVersionMetrics.pageHeight)
                         .allowsHitTesting(i == index)
-                        .opacity(i == index ? 1 : 0.55 + 0.45 * min(abs(drag) / width, 1))
                 }
             }
             .offset(x: -CGFloat(index) * width + drag)

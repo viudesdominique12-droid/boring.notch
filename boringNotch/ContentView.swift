@@ -43,6 +43,15 @@ struct ContentView: View {
     @Default(.pagedLayout) var pagedLayout
     @Default(.closedNotchStatus) var closedNotchStatus
 
+    /// ma-version: real Liquid Glass needs to see what's behind the window, so
+    /// when it's on, nothing above it may force an offscreen render pass
+    /// (no .shadow, no .compositingGroup). Based on the setting only — never
+    /// on open/closed — so the view tree isn't rebuilt on every open.
+    private var glassEnabled: Bool {
+        if #available(macOS 26.0, *) { return liquidGlassNotch }
+        return false
+    }
+
     /// ma-version: layout B reuses the compact (mini) notch geometry.
     private var isMiniLayout: Bool { Defaults[.compactMode] || pagedLayout }
 
@@ -104,9 +113,11 @@ struct ContentView: View {
     @ViewBuilder
     private var notchBackground: some View {
         if #available(macOS 26.0, *), liquidGlassNotch, vm.notchState == .open {
+            // Same material as Control Center: plain .regular glass in dark
+            // appearance (the notch window is darkAqua). Tint only if asked.
             Color.clear
                 .glassEffect(
-                    .regular.tint(Color.black.opacity(liquidGlassTint)),
+                    .regular.tint(liquidGlassTint > 0.02 ? Color.black.opacity(liquidGlassTint) : nil),
                     in: currentNotchShape
                 )
         } else {
@@ -317,10 +328,12 @@ struct ContentView: View {
                             .frame(height: 1)
                             .padding(.horizontal, topCornerRadius)
                     }
-                    .shadow(
-                        color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
-                            ? .black.opacity(0.7) : .clear, radius: 6
-                    )
+                    .conditionalModifier(!glassEnabled) { view in
+                        view.shadow(
+                            color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
+                                ? .black.opacity(0.7) : .clear, radius: 6
+                        )
+                    }
                     // Removed conditional bottom padding when using custom 0 notch to keep layout stable
                     .opacity((isNotchHeightZero && vm.notchState == .closed) ? 0.01 : 1)
 
@@ -416,7 +429,7 @@ struct ContentView: View {
         .padding(.bottom, 8)
         .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
         .ignoresSafeArea(.all)
-        .compositingGroup()
+        .conditionalModifier(!glassEnabled) { $0.compositingGroup() }
         .scaleEffect(
             x: gestureScale,
             y: gestureScale,
