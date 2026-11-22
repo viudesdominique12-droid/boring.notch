@@ -308,7 +308,15 @@ struct ContentView: View {
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
                     .background {
-                        if !showsNativeGlass { Color.black }
+                        if !showsNativeGlass {
+                            Color.black
+                        } else {
+                            // Glass pixels are drawn by the window server, so
+                            // the window counts them as transparent and lets
+                            // clicks and swipes fall through to the app below.
+                            // A 1% fill makes the notch body hit-testable.
+                            Color.black.opacity(0.01)
+                        }
                     }
                     .clipShape(currentNotchShape)
                     // Outside the clip on purpose: the glass draws its own
