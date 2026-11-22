@@ -40,6 +40,25 @@ struct ContentView: View {
     @Default(.showNotHumanFace) var showNotHumanFace
     @Default(.liquidGlassNotch) var liquidGlassNotch
     @Default(.liquidGlassTint) var liquidGlassTint
+    @Default(.pagedLayout) var pagedLayout
+    @Default(.closedNotchStatus) var closedNotchStatus
+
+    /// ma-version: layout B reuses the compact (mini) notch geometry.
+    private var isMiniLayout: Bool { Defaults[.compactMode] || pagedLayout }
+
+    /// ma-version: temperature + battery around the camera when nothing
+    /// else is using the closed notch.
+    private var showsClosedStatus: Bool {
+        closedNotchStatus
+            && vm.notchState == .closed
+            && vm.hasNotch
+            && !vm.hideOnClosed
+            && liveActivities.isEmpty
+            && !coordinator.expandingView.show
+            && !coordinator.helloAnimationRunning
+            && !coordinator.shouldShowSneakPeek(on: vm.screenUUID)
+            && !shouldDisplayNowPlayingFallbackNotice
+    }
 
     // Use standardized animations from StandardAnimations enum
     private let animationSpring = StandardAnimations.interactive
@@ -62,7 +81,7 @@ struct ContentView: View {
     /// Compact mode gets a rounder opened shape (35 vs 19) — at its smaller
     /// size the standard radius reads square rather than pill-like.
     private var openedInsets: (top: CGFloat, bottom: CGFloat) {
-        Defaults[.compactMode] ? compactCornerRadiusInsets.opened : cornerRadiusInsets.opened
+        isMiniLayout ? compactCornerRadiusInsets.opened : cornerRadiusInsets.opened
     }
 
     private var topCornerRadius: CGFloat {
@@ -151,7 +170,7 @@ struct ContentView: View {
     /// lever anyway.
     private var openNotchHeight: CGFloat? {
         if notificationManager.activeNotification != nil { return 132 }
-        return Defaults[.compactMode] ? nil : vm.notchSize.height
+        return isMiniLayout ? nil : vm.notchSize.height
     }
 
     /// Compact mode drops the tab bar along with the tabs it switches
@@ -161,7 +180,7 @@ struct ContentView: View {
     private var showsHeader: Bool {
         vm.notchState == .open
             && notificationManager.activeNotification == nil
-            && !Defaults[.compactMode]
+            && !isMiniLayout
     }
 
     /// The activity currently on top of the stack — what the chin has to be
@@ -178,6 +197,7 @@ struct ContentView: View {
         case batteryStatus
         case osd(SneakContentType)
         case activities([LiveActivityItem])
+        case status
         case face
         case idle
     }
@@ -195,6 +215,9 @@ struct ContentView: View {
         }
         if !liveActivities.isEmpty, !vm.hideOnClosed {
             return .activities(liveActivities)
+        }
+        if showsClosedStatus {
+            return .status
         }
         if !coordinator.expandingView.show,
            !musicManager.isPlaying,
@@ -231,6 +254,8 @@ struct ContentView: View {
                     chinWidth += 2 * inlineMusicPeekLabelWidth
                 }
             }
+        } else if showsClosedStatus {
+            chinWidth += 2 * ClosedStatusContent.sideWidth
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace]
             && !vm.hideOnClosed {
@@ -498,6 +523,12 @@ struct ContentView: View {
                                       .frame(alignment: .center)
                               }
                           }
+                      } else if showsClosedStatus {
+                          MaVersionClosedStatus(
+                              notchWidth: vm.closedNotchSize.width,
+                              height: displayClosedNotchHeight
+                          )
+                          .transition(.opacity)
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed {
                           BoringFaceAnimation()
                        } else if showsHeader {
@@ -509,6 +540,14 @@ struct ContentView: View {
                            BoringHeader()
                                .frame(height: max(38, displayClosedNotchHeight))
                                .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
+                       }
+                       else if vm.notchState == .open && pagedLayout
+                                && notificationManager.activeNotification == nil {
+                           // ma-version: page title | camera | temperature + battery.
+                           // Negative padding lets it use the panel's side margins.
+                           MaVersionTopBar(notchWidth: vm.closedNotchSize.width)
+                               .frame(width: MaVersionMetrics.pageWidth + 52, height: displayClosedNotchHeight)
+                               .padding(.horizontal, -26)
                        }
                         // New case to enable compact notch on external displays
                         else if !vm.hasNotch {
@@ -567,6 +606,18 @@ struct ContentView: View {
                     if let notification = notificationManager.activeNotification {
                         NotificationExpandedView(notification: notification)
                             .id(notification.id)
+                    } else if pagedLayout {
+                        MaVersionPagesView(
+                            albumArtNamespace: albumArtNamespace,
+                            horizontalMediaGestureFeedback: horizontalMediaGestureFeedback
+                        )
+                        .frame(width: MaVersionMetrics.pageWidth)
+                        .onHover { hovering in
+                            isHoveringMusicArea = hovering
+                        }
+                        .onDisappear {
+                            isHoveringMusicArea = false
+                        }
                     } else if Defaults[.compactMode] {
                         // Player only — no tab switching, so currentView is
                         // ignored here rather than offering a shelf the
@@ -1054,6 +1105,7 @@ extension ContentView {
             return coordinator.musicLiveActivityEnabled && (musicManager.isPlaying || !musicManager.isPlayerIdle)
 
         case .open:
+            if pagedLayout { return false }
             if Defaults[.compactMode] {
                 return !musicManager.isPlayerIdle && isHoveringMusicArea
             }

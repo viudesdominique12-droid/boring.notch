@@ -2,15 +2,18 @@
 //  MaVersionSettingsView.swift
 //  boringNotch — ma-version
 //
-//  Settings for the features added in this fork: weather, small music
-//  player and the Liquid Glass look.
+//  Settings for the features added in this fork.
 //
 
+import AppKit
 import Defaults
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct MaVersionSettingsView: View {
     @Default(.weatherCity) private var weatherCity
+    @Default(.shortcutApps) private var shortcutApps
+    @Default(.focusCustomMinutes) private var focusCustomMinutes
     @Default(.liquidGlassNotch) private var liquidGlassNotch
     @Default(.liquidGlassTint) private var liquidGlassTint
     @ObservedObject private var weather = WeatherManager.shared
@@ -19,14 +22,27 @@ struct MaVersionSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Defaults.Toggle(key: .showWeather) {
-                    Text("Afficher la météo dans l'encoche")
+                Defaults.Toggle(key: .pagedLayout) {
+                    Text("Mini encoche avec pages à faire glisser")
                 }
+                Defaults.Toggle(key: .rememberLastPage) {
+                    Text("Rouvrir sur la dernière page")
+                }
+                Defaults.Toggle(key: .closedNotchStatus) {
+                    Text("Encoche fermée : degrés à gauche, batterie à droite")
+                }
+            } header: {
+                Text("Agencement")
+            } footer: {
+                Text("Glisse à deux doigts sur l'encoche ouverte : Musique → Météo → Agenda → Minuteur → Apps. Tu peux aussi cliquer sur les petits points.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 HStack {
-                    TextField("Ville", text: $cityDraft, prompt: Text("ex. Strasbourg"))
+                    TextField("Ville", text: $cityDraft, prompt: Text("Strasbourg"))
                         .onSubmit(saveCity)
                     Button("Valider", action: saveCity)
-                        .disabled(cityDraft.trimmingCharacters(in: .whitespaces) == weatherCity)
                 }
                 statusRow
             } header: {
@@ -37,18 +53,35 @@ struct MaVersionSettingsView: View {
             }
 
             Section {
-                Defaults.Toggle(key: .smallMediaPlayer) {
-                    Text("Petit lecteur de musique")
+                ForEach(0..<4, id: \.self) { slot in
+                    HStack(spacing: 10) {
+                        if let id = bundleID(at: slot), let icon = ShortcutApps.icon(for: id) {
+                            Image(nsImage: icon).resizable().frame(width: 22, height: 22)
+                        } else {
+                            Image(systemName: "app.dashed").frame(width: 22, height: 22)
+                        }
+                        Text(bundleID(at: slot).map(ShortcutApps.name(for:)) ?? "Vide")
+                        Spacer()
+                        Button("Changer…") { pickApp(for: slot) }
+                    }
                 }
             } header: {
-                Text("Musique")
+                Text("Page Apps")
+            }
+
+            Section {
+                Stepper(value: $focusCustomMinutes, in: 5...120, step: 5) {
+                    Text("Minuteur libre : \(focusCustomMinutes) min")
+                }
+            } header: {
+                Text("Minuteur")
             } footer: {
-                Text("Pochette plus petite et seulement 3 boutons (précédent, lecture, suivant).")
+                Text("Travail = 25 min, Pause = 5 min. Un son « Glass » sonne à la fin.")
                     .foregroundStyle(.secondary)
             }
 
             Section {
-                Toggle("Effet Liquid Glass quand l'encoche est ouverte", isOn: $liquidGlassNotch)
+                Toggle("Effet Liquid Glass (en cours d'amélioration)", isOn: $liquidGlassNotch)
                 if liquidGlassNotch {
                     HStack {
                         Text("Assombrissement")
@@ -58,15 +91,8 @@ struct MaVersionSettingsView: View {
                             .frame(width: 44, alignment: .trailing)
                     }
                 }
-                if #unavailable(macOS 26.0) {
-                    Text("Nécessite macOS 26 ou plus récent.")
-                        .foregroundStyle(.secondary)
-                }
             } header: {
                 Text("Apparence")
-            } footer: {
-                Text("Plus d'assombrissement = texte plus lisible sur un fond d'écran clair.")
-                    .foregroundStyle(.secondary)
             }
         }
         .onAppear { cityDraft = weatherCity }
@@ -74,8 +100,29 @@ struct MaVersionSettingsView: View {
         .navigationTitle("Ma version")
     }
 
+    private func bundleID(at slot: Int) -> String? {
+        slot < shortcutApps.count ? shortcutApps[slot] : nil
+    }
+
     private func saveCity() {
         weatherCity = cityDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        weather.refresh()
+    }
+
+    private func pickApp(for slot: Int) {
+        let panel = NSOpenPanel()
+        panel.title = "Choisis une app"
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        guard panel.runModal() == .OK, let url = panel.url,
+              let id = Bundle(url: url)?.bundleIdentifier
+        else { return }
+        var apps = shortcutApps
+        while apps.count < 4 { apps.append("") }
+        apps[slot] = id
+        shortcutApps = apps
     }
 
     @ViewBuilder
@@ -87,8 +134,8 @@ struct MaVersionSettingsView: View {
                     .symbolRenderingMode(.multicolor)
                 Text(weather.cityDetail.isEmpty ? weather.cityName : "\(weather.cityName), \(weather.cityDetail)")
                 Spacer()
-                if let temp = weather.temperature {
-                    Text("\(Int(temp.rounded()))°").monospacedDigit()
+                if let temp = weather.shortTemperature {
+                    Text(temp).monospacedDigit()
                 }
             }
             .foregroundStyle(.secondary)

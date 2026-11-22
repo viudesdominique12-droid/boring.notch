@@ -17,18 +17,13 @@ struct MusicPlayerView: View {
     let albumArtNamespace: Namespace.ID
     let horizontalMediaGestureFeedback: CGFloat
     @Binding var isHoveringMusicArea: Bool
-    @Default(.smallMediaPlayer) private var smallMediaPlayer
 
     var body: some View {
         HStack {
-            AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
-                .frame(width: smallMediaPlayer ? 62 : 120)
-                .padding(.all, 5 * (vm.notchSize.height / 190))
+            AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace).frame(width: 120).padding(.all, 5 * (vm.notchSize.height / 190))
             MusicControlsView(horizontalMediaGestureFeedback: horizontalMediaGestureFeedback)
                 .compositingGroup()
         }
-        // ma-version: the small player takes a fixed slice so the weather card gets the rest.
-        .frame(width: smallMediaPlayer ? 215 : nil)
         .contentShape(Rectangle())
         .onHover { hovering in
             isHoveringMusicArea = hovering
@@ -240,10 +235,6 @@ struct MusicControlsView: View {
             max(slotLimit, MusicControlButton.minSlotCount),
             MusicControlButton.maxSlotCount
         )
-        // ma-version: the small player only has room for the essentials.
-        if Defaults[.smallMediaPlayer] {
-            return [.previous, .playPause, .next]
-        }
         let padded = slotConfig.padded(to: sanitizedLimit, filler: .none)
         let result = Array(padded.prefix(sanitizedLimit))
         // If calendar and camera are both visible alongside music, hide the edge slots
@@ -565,7 +556,6 @@ struct NotchHomeView: View {
     let albumArtNamespace: Namespace.ID
     let horizontalMediaGestureFeedback: CGFloat
     @Binding var isHoveringMusicArea: Bool
-    @Default(.showWeather) private var showWeather
 
     var body: some View {
         mainContent
@@ -583,14 +573,6 @@ struct NotchHomeView: View {
                 horizontalMediaGestureFeedback: horizontalMediaGestureFeedback,
                 isHoveringMusicArea: $isHoveringMusicArea
             )
-
-            // ma-version: weather card, takes whatever width is left.
-            if showWeather {
-                WeatherView()
-                    .frame(minWidth: 120, maxWidth: .infinity)
-                    .padding(.vertical, 4)
-                    .transition(.opacity)
-            }
 
             if Defaults[.showCalendar] {
                 CalendarView()

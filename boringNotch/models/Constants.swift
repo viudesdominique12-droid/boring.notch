@@ -511,8 +511,18 @@ extension Defaults.Keys {
     static let showWeather = Key<Bool>("showWeather", default: true)
     /// City typed by the user in Settings → Ma version. Empty until they set it.
     static let weatherCity = Key<String>("weatherCity", default: "")
-    /// Shrinks the home-view music player to a small art + 3 transport buttons.
-    static let smallMediaPlayer = Key<Bool>("smallMediaPlayer", default: true)
+    /// Layout B: mini notch whose content is swipeable pages (music, weather,
+    /// agenda, timer, apps). Off = upstream layouts untouched.
+    static let pagedLayout = Key<Bool>("pagedLayout", default: true)
+    static let rememberLastPage = Key<Bool>("rememberLastPage", default: true)
+    static let lastNotchPage = Key<String>("lastNotchPage", default: "music")
+    /// Closed notch shows the temperature left of the camera, battery right.
+    static let closedNotchStatus = Key<Bool>("closedNotchStatus", default: true)
+    static let shortcutApps = Key<[String]>(
+        "shortcutApps",
+        default: ["com.apple.Safari", "com.apple.MobileSMS", "com.apple.Notes", "com.apple.finder"]
+    )
+    static let focusCustomMinutes = Key<Int>("focusCustomMinutes", default: 10)
     /// Liquid Glass background for the opened notch (macOS 26+). Closed notch stays black.
     static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
     /// How much black is mixed into the glass, so white text stays readable.

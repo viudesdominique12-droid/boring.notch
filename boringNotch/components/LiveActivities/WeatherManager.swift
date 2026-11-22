@@ -2,12 +2,13 @@
 //  WeatherManager.swift
 //  boringNotch — ma-version
 //
-//  Fetches current weather + the next few hours from Open-Meteo
-//  (https://open-meteo.com — free, no account, no API key). Only the city
-//  name the user typed in Settings → Ma version is sent: no location
+//  Fetches current weather, the next few hours and a 2-hour rain outlook
+//  from Open-Meteo (https://open-meteo.com — free, no account, no API key).
+//  Only the city name typed in Settings → Ma version is sent: no location
 //  permission, no tracking.
 //
 
+import AppKit
 import Combine
 import Defaults
 import Foundation
@@ -25,14 +26,6 @@ final class WeatherManager: ObservableObject {
         case failed
     }
 
-    struct HourForecast: Identifiable, Equatable {
-        let date: Date
-        let temperature: Double
-        let code: Int
-        let isDay: Bool
-        var id: Date { date }
-    }
-
     @Published private(set) var status: Status = .idle
     @Published private(set) var cityName: String = ""
     @Published private(set) var cityDetail: String = ""
@@ -41,7 +34,8 @@ final class WeatherManager: ObservableObject {
     @Published private(set) var isDay: Bool = true
     @Published private(set) var high: Double?
     @Published private(set) var low: Double?
-    @Published private(set) var hourly: [HourForecast] = []
+    @Published private(set) var hourly: [WeatherHour] = []
+    @Published private(set) var rain: RainOutlook = .unknown
     @Published private(set) var timeZone: TimeZone = .current
 
     private var lastFetch: Date?
@@ -63,9 +57,49 @@ final class WeatherManager: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // The temperature is always visible in the closed notch now, so keep
+        // it fresh: every 15 min, and right after the Mac wakes up.
         timer = Timer.scheduledTimer(withTimeInterval: 15 * 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
+        NSWorkspace.shared.notificationCenter
+            .publisher(for: NSWorkspace.didWakeNotification)
+            .delay(for: .seconds(5), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.refresh() }
+            .store(in: &cancellables)
+    }
+
+    /// Short text for the closed notch / top bar, e.g. "9°". Nil when unknown.
+    var shortTemperature: String? {
+        guard status == .loaded || temperature != nil, temperature != nil else { return nil }
+        return WeatherCondition.temperatureText(temperature)
+    }
+
+    var pageState: WeatherPageState {
+        switch status {
+        case .needsCity: return .needsCity
+        case .cityNotFound: return .cityNotFound
+        case .failed where temperature == nil: return .failed
+        case .idle, .loading, .failed:
+            if temperature == nil { return .loading }
+            return .loaded(snapshot)
+        case .loaded:
+            return .loaded(snapshot)
+        }
+    }
+
+    var snapshot: WeatherSnapshot {
+        WeatherSnapshot(
+            city: cityName,
+            temperature: temperature,
+            code: weatherCode,
+            isDay: isDay,
+            low: low,
+            high: high,
+            hours: hourly,
+            rain: rain,
+            timeZone: timeZone
+        )
     }
 
     /// Called when the notch opens: refetch only if the data is older than 10 min.
@@ -78,7 +112,6 @@ final class WeatherManager: ObservableObject {
 
     func refresh() {
         let query = Defaults[.weatherCity].trimmingCharacters(in: .whitespacesAndNewlines)
-        guard Defaults[.showWeather] else { return }
         guard !query.isEmpty else {
             fetchTask?.cancel()
             status = .needsCity
@@ -126,8 +159,7 @@ final class WeatherManager: ObservableObject {
         } catch {
             if (error as? URLError)?.code == .cancelled { return }
             NSLog("[WeatherManager] fetch failed: %@", error.localizedDescription)
-            // Keep showing the last good data if we have some.
-            if temperature == nil { status = .failed }
+            status = .failed
         }
     }
 
@@ -148,9 +180,11 @@ final class WeatherManager: ObservableObject {
         components.queryItems = [
             URLQueryItem(name: "latitude", value: String(lat)),
             URLQueryItem(name: "longitude", value: String(lon)),
-            URLQueryItem(name: "current", value: "temperature_2m,weather_code,is_day"),
+            URLQueryItem(name: "current", value: "temperature_2m,weather_code,is_day,precipitation"),
             URLQueryItem(name: "hourly", value: "temperature_2m,weather_code,is_day"),
             URLQueryItem(name: "daily", value: "temperature_2m_max,temperature_2m_min"),
+            URLQueryItem(name: "minutely_15", value: "precipitation"),
+            URLQueryItem(name: "forecast_minutely_15", value: "9"),
             URLQueryItem(name: "timezone", value: "auto"),
             URLQueryItem(name: "forecast_days", value: "2")
         ]
@@ -174,7 +208,7 @@ final class WeatherManager: ObservableObject {
         parser.dateFormat = "yyyy-MM-dd'T'HH:mm"
 
         let now = Date()
-        var hours: [HourForecast] = []
+        var hours: [WeatherHour] = []
         let h = forecast.hourly
         for index in h.time.indices {
             guard let date = parser.date(from: h.time[index]), date > now,
@@ -182,10 +216,39 @@ final class WeatherManager: ObservableObject {
                   let temp = h.temperature[index], let code = h.weatherCode[index]
             else { continue }
             let day = index < h.isDay.count ? (h.isDay[index] ?? 1) : 1
-            hours.append(HourForecast(date: date, temperature: temp, code: code, isDay: day == 1))
+            hours.append(WeatherHour(date: date, temperature: temp, code: code, isDay: day == 1))
             if hours.count == 4 { break }
         }
         hourly = hours
+
+        rain = Self.rainOutlook(forecast: forecast, parser: parser, now: now)
+    }
+
+    /// Reads the 15-minute precipitation steps covering the next ~2 hours.
+    private static func rainOutlook(forecast: ForecastResponse, parser: DateFormatter, now: Date) -> RainOutlook {
+        guard let minutely = forecast.minutely15 else { return .unknown }
+        let threshold = 0.05 // mm per 15 min — below that it's just noise
+        var steps: [(start: Date, wet: Bool)] = []
+        for index in minutely.time.indices {
+            guard let date = parser.date(from: minutely.time[index]),
+                  date.addingTimeInterval(15 * 60) > now
+            else { continue }
+            let amount = index < minutely.precipitation.count ? (minutely.precipitation[index] ?? 0) : 0
+            steps.append((date, amount >= threshold))
+        }
+        guard !steps.isEmpty else { return .unknown }
+
+        let rainingNow = (forecast.current.precipitation ?? 0) > 0 || steps[0].wet
+        if rainingNow {
+            if let dry = steps.first(where: { !$0.wet }) {
+                return .rainingUntil(max(dry.start, now))
+            }
+            return .rainingUntil(nil)
+        }
+        if let wet = steps.first(where: { $0.wet }) {
+            return .startsAt(max(wet.start, now))
+        }
+        return .dry
     }
 }
 
@@ -208,11 +271,13 @@ private struct ForecastResponse: Decodable {
         let temperature: Double
         let weatherCode: Int
         let isDay: Int
+        let precipitation: Double?
 
         enum CodingKeys: String, CodingKey {
             case temperature = "temperature_2m"
             case weatherCode = "weather_code"
             case isDay = "is_day"
+            case precipitation
         }
     }
 
@@ -240,63 +305,20 @@ private struct ForecastResponse: Decodable {
         }
     }
 
+    struct Minutely: Decodable {
+        let time: [String]
+        let precipitation: [Double?]
+    }
+
     let utcOffsetSeconds: Int
     let current: Current
     let hourly: Hourly
     let daily: Daily
+    let minutely15: Minutely?
 
     enum CodingKeys: String, CodingKey {
         case utcOffsetSeconds = "utc_offset_seconds"
         case current, hourly, daily
-    }
-}
-
-// MARK: - WMO weather codes → SF Symbol + French label
-
-enum WeatherCondition {
-    static func symbol(for code: Int, isDay: Bool) -> String {
-        switch code {
-        case 0: return isDay ? "sun.max.fill" : "moon.stars.fill"
-        case 1: return isDay ? "sun.max.fill" : "moon.fill"
-        case 2: return isDay ? "cloud.sun.fill" : "cloud.moon.fill"
-        case 3: return "cloud.fill"
-        case 45, 48: return "cloud.fog.fill"
-        case 51, 53, 55: return "cloud.drizzle.fill"
-        case 56, 57, 66, 67: return "cloud.sleet.fill"
-        case 61, 63: return "cloud.rain.fill"
-        case 65: return "cloud.heavyrain.fill"
-        case 71, 73, 75, 85, 86: return "cloud.snow.fill"
-        case 77: return "snowflake"
-        case 80, 81: return isDay ? "cloud.sun.rain.fill" : "cloud.moon.rain.fill"
-        case 82: return "cloud.heavyrain.fill"
-        case 95, 96, 99: return "cloud.bolt.rain.fill"
-        default: return "cloud.fill"
-        }
-    }
-
-    static func label(for code: Int) -> String {
-        switch code {
-        case 0: return "Ciel dégagé"
-        case 1: return "Plutôt dégagé"
-        case 2: return "Partiellement nuageux"
-        case 3: return "Couvert"
-        case 45, 48: return "Brouillard"
-        case 51, 53, 55: return "Bruine"
-        case 56, 57: return "Bruine verglaçante"
-        case 61: return "Pluie légère"
-        case 63: return "Pluie"
-        case 65: return "Forte pluie"
-        case 66, 67: return "Pluie verglaçante"
-        case 71: return "Neige légère"
-        case 73: return "Neige"
-        case 75: return "Forte neige"
-        case 77: return "Grains de neige"
-        case 80, 81: return "Averses"
-        case 82: return "Fortes averses"
-        case 85, 86: return "Averses de neige"
-        case 95: return "Orage"
-        case 96, 99: return "Orage et grêle"
-        default: return "—"
-        }
+        case minutely15 = "minutely_15"
     }
 }

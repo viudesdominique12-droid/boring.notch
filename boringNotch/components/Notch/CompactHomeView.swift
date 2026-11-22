@@ -29,6 +29,8 @@ struct CompactHomeView: View {
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     let albumArtNamespace: Namespace.ID
     let horizontalMediaGestureFeedback: CGFloat
+    /// ma-version: layout B shows the battery in its own top bar.
+    var showsBatteryOverlay: Bool = true
 
     @State private var sliderValue: Double = 0
     @State private var dragging: Bool = false
@@ -122,7 +124,7 @@ struct CompactHomeView: View {
             // Compact mode hides BoringHeader (it spans the full notch
             // width), which took the battery with it. Overlaid rather than
             // placed in the HStack so it doesn't steal width from the title.
-            if Defaults[.showBatteryIndicator] {
+            if showsBatteryOverlay && Defaults[.showBatteryIndicator] {
                 BoringBatteryView(
                     batteryWidth: 24,
                     isCharging: batteryModel.isCharging,
