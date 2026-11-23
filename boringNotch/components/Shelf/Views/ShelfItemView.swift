@@ -14,6 +14,7 @@ struct ShelfItemView: View {
     @StateObject private var viewModel: ShelfItemViewModel
     @State private var selectionState: ShelfItemSelectionState
     @State private var debouncedDropTarget = false
+    @Environment(\.compactShelf) private var compact
 
     private var isSelected: Bool { selectionState.isSelected }
 
@@ -79,9 +80,9 @@ struct ShelfItemView: View {
             iconView
             textView
         }
-        .frame(width: 105)
-        .padding(.vertical, 10)
-        .padding(.horizontal, 5)
+        .frame(width: compact ? 72 : 105)
+        .padding(.vertical, compact ? 6 : 10)
+        .padding(.horizontal, compact ? 3 : 5)
         .background(backgroundView)
         .contentShape(Rectangle())
         .animation(.easeInOut(duration: 0.1), value: debouncedDropTarget)
@@ -105,19 +106,19 @@ struct ShelfItemView: View {
     private var iconView: some View {
         Image(nsImage: viewModel.thumbnail ?? item.icon)
             .resizable().scaledToFit()
-            .frame(width: 56, height: 56)
+            .frame(width: compact ? 42 : 56, height: compact ? 42 : 56)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
     }
 
     private var textView: some View {
         Text(item.displayName)
-            .font(.system(size: 12, weight: .medium))
+            .font(.system(size: compact ? 10 : 12, weight: .medium))
             .foregroundStyle(.primary)
             .lineLimit(2)
             .truncationMode(.middle)
             .multilineTextAlignment(.center)
-            .frame(height: 30, alignment: .top)
+            .frame(height: compact ? 26 : 30, alignment: .top)
     }
 
     private var backgroundView: some View {

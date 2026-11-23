@@ -13,6 +13,7 @@ struct ShelfView: View {
     let dropInteraction: DropInteractionState
     let animation: Animation?
     @StateObject var shelfState = ShelfStateViewModel.shared
+    @Environment(\.compactShelf) private var compact
 
     private let spacing: CGFloat = 8
 
@@ -24,9 +25,13 @@ struct ShelfView: View {
         @Bindable var interaction = dropInteraction
 
         ShelfQuickLookHost { quickLookService in
-            HStack(spacing: 12) {
-                FileShareView(dropInteraction: dropInteraction)
-                    .aspectRatio(1, contentMode: .fit)
+            HStack(spacing: compact ? 8 : 12) {
+                let share = FileShareView(dropInteraction: dropInteraction)
+                if compact {
+                    share.frame(width: 84)
+                } else {
+                    share.aspectRatio(1, contentMode: .fit)
+                }
                 panel(quickLookService: quickLookService)
                     .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], isTargeted: $interaction.dragDetectorTargeting) { providers in
                         handleDrop(providers: providers)
@@ -43,18 +48,18 @@ struct ShelfView: View {
     }
 
     private func panel(quickLookService: QuickLookService) -> some View {
-        RoundedRectangle(cornerRadius: 16)
+        RoundedRectangle(cornerRadius: compact ? 12 : 16)
             .stroke(
                 dropInteraction.dragDetectorTargeting
                     ? Color.accentColor.opacity(0.9)
                     : Color.white.opacity(0.1),
-                style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [10])
+                style: StrokeStyle(lineWidth: compact ? 2 : 3, lineCap: .round, dash: [compact ? 7 : 10])
             )
             .overlay {
                 ZStack {
                     ShelfBackgroundInteractionView()
                     content(quickLookService: quickLookService)
-                        .padding()
+                        .padding(compact ? 8 : nil)
                 }
             }
             .transaction { transaction in
@@ -67,17 +72,18 @@ struct ShelfView: View {
 
         return Group {
             if shelfState.isEmpty {
-                VStack(spacing: 10) {
+                VStack(spacing: compact ? 6 : 10) {
                     Image(systemName: "tray.and.arrow.down")
                         .symbolVariant(.fill)
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.white, .gray)
                         .imageScale(.large)
 
-                    Text("Drop files here")
+                    Text(compact ? "Dépose tes fichiers ici" : "Drop files here")
                         .foregroundStyle(.gray)
-                        .font(.system(.title3, design: .rounded))
+                        .font(.system(compact ? .callout : .title3, design: .rounded))
                         .fontWeight(.medium)
+                        .multilineTextAlignment(.center)
                 }
             } else {
                 ScrollView(.horizontal) {

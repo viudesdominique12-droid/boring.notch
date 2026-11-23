@@ -13,6 +13,18 @@ import SwiftUI
 
 // MARK: - Shared metrics
 
+/// The Files page reuses the app's shelf with smaller tiles.
+private struct CompactShelfKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var compactShelf: Bool {
+        get { self[CompactShelfKey.self] }
+        set { self[CompactShelfKey.self] = newValue }
+    }
+}
+
 enum MaVersionMetrics {
     /// Content width of the open mini notch (same as upstream compact mode).
     static let pageWidth: CGFloat = 336

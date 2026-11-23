@@ -109,8 +109,9 @@ struct MaVersionPagesView: View {
                 TimerPage()
             case .files:
                 ShelfView(dropInteraction: vm.dropInteraction, animation: vm.animation)
+                    .environment(\.compactShelf, true)
                     .padding(.horizontal, 6)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, 4)
             case .clipboard:
                 ClipboardPage()
             case .shortcuts:
