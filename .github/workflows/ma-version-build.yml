@@ -3,17 +3,21 @@ on:
   push:
     branches: [ma-version]
   workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner label (macos-latest is often short of capacity)"
+        default: macos-latest
 
 permissions:
   contents: read
 
 concurrency:
-  group: build-ma-version
+  group: build-ma-version-${{ inputs.runner || 'macos-latest' }}
   cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runner || 'macos-latest' }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
