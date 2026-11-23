@@ -41,6 +41,7 @@ struct ContentView: View {
     @Default(.liquidGlassNotch) var liquidGlassNotch
     @Default(.liquidGlassTint) var liquidGlassTint
     @Default(.pagedLayout) var pagedLayout
+    @Default(.bouncyOpen) var bouncyOpen
     @ObservedObject var focusTimer = FocusTimer.shared
     @ObservedObject var glanceCenter = GlanceCenter.shared
     @ObservedObject var upcomingEvents = UpcomingEventMonitor.shared
@@ -746,11 +747,7 @@ struct ContentView: View {
                         }
                     }
                 }
-                .transition(
-                    .scale(scale: 0.8, anchor: .top)
-                    .combined(with: .opacity)
-                    .animation(.smooth(duration: 0.35))
-                )
+                .transition(openContentTransition)
                 .zIndex(1)
                 .allowsHitTesting(vm.notchState == .open)
                 .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
@@ -975,6 +972,21 @@ struct ContentView: View {
 
 extension ContentView {
     @discardableResult
+    /// The open content grows out of the camera. With the bounce on, it pops
+    /// past full size and settles, like the Dynamic Island; closing stays smooth.
+    private var openContentTransition: AnyTransition {
+        let plain = AnyTransition.scale(scale: 0.8, anchor: .top)
+            .combined(with: .opacity)
+            .animation(.smooth(duration: 0.35))
+        guard bouncyOpen, Defaults[.enableOpeningAnimation] else { return plain }
+        return .asymmetric(
+            insertion: .scale(scale: 0.55, anchor: .top)
+                .combined(with: .opacity)
+                .animation(.spring(response: 0.5, dampingFraction: 0.58)),
+            removal: plain
+        )
+    }
+
     /// Paged layout: bring the Fichiers page forward for a drag in progress.
     private func showFilesPage() {
         guard pagedLayout, Defaults[.boringShelf],

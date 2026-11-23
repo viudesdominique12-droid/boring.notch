@@ -535,6 +535,8 @@ extension Defaults.Keys {
     static let deviceAlert = Key<Bool>("deviceAlert", default: true)
     // Clipboard page (kept in memory only)
     static let clipboardHistory = Key<Bool>("clipboardHistory", default: true)
+    /// Pages follow the fingers like iOS; true flips it.
+    static let invertPageSwipe = Key<Bool>("invertPageSwipe", default: false)
     /// Liquid Glass background for the opened notch (macOS 26+). Closed notch stays black.
     static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
     /// How much black is mixed into the glass, so white text stays readable.

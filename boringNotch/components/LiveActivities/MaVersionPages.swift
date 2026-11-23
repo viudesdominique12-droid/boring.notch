@@ -86,13 +86,15 @@ struct MaVersionPagesView: View {
     @ObservedObject private var model = NotchPageModel.shared
     @Default(.pageDepthEffect) private var depthEffect
     @Default(.pageHaptics) private var haptics
+    @Default(.invertPageSwipe) private var invertSwipe
 
     var body: some View {
         SwipePager(
             count: NotchPage.allCases.count,
             index: $model.index,
             depthEffect: depthEffect,
-            haptics: haptics
+            haptics: haptics,
+            invertSwipe: invertSwipe
         ) { i in
             switch NotchPage.allCases[i] {
             case .music:

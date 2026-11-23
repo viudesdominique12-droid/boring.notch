@@ -1072,6 +1072,7 @@ struct ClipboardPageContent: View {
 /// Approach inspired by Sapphire's NotchSwipeRow (latch + consume); code is
 /// our own.
 struct HorizontalSwipeMonitor: NSViewRepresentable {
+    var inverted: Bool = false
     var onChanged: (CGFloat) -> Void
     var onEnded: (_ offset: CGFloat, _ velocity: CGFloat) -> Void
 
@@ -1084,6 +1085,7 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.onChanged = onChanged
         context.coordinator.onEnded = onEnded
+        context.coordinator.inverted = inverted
     }
 
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
@@ -1097,6 +1099,7 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
     @MainActor final class Coordinator: NSObject {
         var onChanged: (CGFloat) -> Void
         var onEnded: (CGFloat, CGFloat) -> Void
+        var inverted = false
         private var monitor: Any?
         private var active = false
         private var offset: CGFloat = 0
@@ -1175,9 +1178,11 @@ struct HorizontalSwipeMonitor: NSViewRepresentable {
                 active = true
             }
 
-            // Content follows the fingers. Sign checked on the user's Mac.
-            let fingerDX = dx * (event.isDirectionInvertedFromDevice ? -1 : 1)
+            // Content follows the fingers, like iOS: with natural scrolling
+            // the delta already has the finger's sign, otherwise it's flipped.
+            let fingerDX = dx * (event.isDirectionInvertedFromDevice ? 1 : -1)
                 * (event.hasPreciseScrollingDeltas ? 1 : 10)
+                * (inverted ? -1 : 1)
             offset += fingerDX
             velocity = fingerDX
             onChanged(offset)
@@ -1203,20 +1208,27 @@ struct SwipePager<Page: View>: View {
     @Binding var index: Int
     var depthEffect: Bool = false
     var haptics: Bool = false
+    var invertSwipe: Bool = false
     @ViewBuilder let page: (Int) -> Page
 
     @State private var drag: CGFloat = 0
+    /// The detent click already fired for this swipe.
+    @State private var clicked = false
     private let width = MaVersionMetrics.pageWidth
+    /// Distance at which a release turns the page.
+    private let threshold: CGFloat = 40
 
     var body: some View {
         VStack(spacing: 6) {
             HStack(spacing: 0) {
                 ForEach(0..<count, id: \.self) { i in
-                    let distance = depthEffect ? min(abs(CGFloat(i - index) - drag / width), 1) : 0
+                    // 0 = centred, 1 = a full page away (follows the drag).
+                    let distance = depthEffect ? min(abs(CGFloat(i - index) + drag / width), 1) : 0
                     page(i)
                         .frame(width: width, height: MaVersionMetrics.pageHeight)
-                        .scaleEffect(1 - 0.08 * distance)
-                        .opacity(1 - 0.45 * Double(distance))
+                        .scaleEffect(1 - 0.16 * distance)
+                        .opacity(1 - 0.6 * Double(distance))
+                        .blur(radius: 3 * distance)
                         .allowsHitTesting(i == index)
                 }
             }
@@ -1226,17 +1238,26 @@ struct SwipePager<Page: View>: View {
             .contentShape(Rectangle())
             .background(
                 HorizontalSwipeMonitor(
+                    inverted: invertSwipe,
                     onChanged: { offset in
                         drag = rubberBand(offset)
+                        // Click while the fingers are still on the trackpad
+                        // (haptics can't be felt after they lift), at the
+                        // point where letting go would turn the page.
+                        let canTurn = offset < 0 ? index < count - 1 : index > 0
+                        let past = abs(offset) >= threshold && canTurn
+                        if past && !clicked { tick() }
+                        clicked = past
                     },
                     onEnded: { offset, velocity in
                         // Far enough, or a short quick flick, turns one page.
-                        let goNext = offset < -40 || (offset < -12 && velocity < -3)
-                        let goBack = offset > 40 || (offset > 12 && velocity > 3)
+                        let goNext = offset < -threshold || (offset < -12 && velocity < -3)
+                        let goBack = offset > threshold || (offset > 12 && velocity > 3)
                         var target = index
                         if goNext { target = min(index + 1, count - 1) }
                         if goBack { target = max(index - 1, 0) }
-                        if target != index { tick() }
+                        if target != index && !clicked { tick() }
+                        clicked = false
                         withAnimation(.spring(response: 0.42, dampingFraction: 0.72)) {
                             index = target
                             drag = 0
@@ -1255,7 +1276,7 @@ struct SwipePager<Page: View>: View {
     /// A light click on the trackpad, like a detent.
     private func tick() {
         guard haptics else { return }
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
     }
 
     private func rubberBand(_ offset: CGFloat) -> CGFloat {

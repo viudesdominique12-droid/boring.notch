@@ -31,10 +31,13 @@ struct MaVersionSettingsView: View {
                 Defaults.Toggle(key: .closedNotchStatus) {
                     Text("Encoche fermée : degrés à gauche, batterie à droite")
                 }
+                Defaults.Toggle(key: .invertPageSwipe) {
+                    Text("Inverser le sens du glissement")
+                }
             } header: {
                 Text("Agencement")
             } footer: {
-                Text("Glisse à deux doigts sur l'encoche ouverte : Musique → Météo → Agenda → Minuteur → Fichiers → Copies → Apps. Tu peux aussi cliquer sur les petits points.")
+                Text("Glisse à deux doigts sur l'encoche ouverte : Musique → Météo → Agenda → Minuteur → Fichiers → Copies → Apps. Doigts vers la gauche = page suivante, comme sur iPhone. Tu peux aussi cliquer sur les petits points.")
                     .foregroundStyle(.secondary)
             }
 
