@@ -499,10 +499,12 @@ struct ContentView: View {
                 if Defaults[.boringShelf] && vm.notchState == .closed {
                     if doOpen() {
                         coordinator.currentView = .shelf
-                        if pagedLayout {
-                            NotchPageModel.shared.index = NotchPage.allCases.firstIndex(of: .files) ?? 0
-                        }
+                        showFilesPage()
                     }
+                } else if vm.notchState == .open {
+                    // Already open on another page: a file dragged in jumps
+                    // straight to Fichiers, whatever page was showing.
+                    showFilesPage()
                 }
                 return
             }
@@ -973,6 +975,17 @@ struct ContentView: View {
 
 extension ContentView {
     @discardableResult
+    /// Paged layout: bring the Fichiers page forward for a drag in progress.
+    private func showFilesPage() {
+        guard pagedLayout, Defaults[.boringShelf],
+              let files = NotchPage.allCases.firstIndex(of: .files),
+              NotchPageModel.shared.index != files
+        else { return }
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) {
+            NotchPageModel.shared.index = files
+        }
+    }
+
     private func doOpen() -> Bool {
         var didOpen = false
         withAnimation(animationSpring) {
