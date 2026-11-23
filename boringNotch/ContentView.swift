@@ -971,7 +971,6 @@ struct ContentView: View {
 // MARK: - Gesture & Hover Handling
 
 extension ContentView {
-    @discardableResult
     /// The open content grows out of the camera. With the bounce on, it pops
     /// past full size and settles, like the Dynamic Island; closing stays smooth.
     private var openContentTransition: AnyTransition {
@@ -998,6 +997,7 @@ extension ContentView {
         }
     }
 
+    @discardableResult
     private func doOpen() -> Bool {
         var didOpen = false
         withAnimation(animationSpring) {
