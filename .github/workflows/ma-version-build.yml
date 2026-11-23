@@ -47,7 +47,7 @@ jobs:
             ONLY_ACTIVE_ARCH=NO \
             | tee build.log | grep -E "error:|warning: .*glass|BUILD (SUCCEEDED|FAILED)" || true
           ls build/Build/Products/Release/
-          test -n "$(ls -d build/Build/Products/Release/*.app)"
+          grep -q "BUILD SUCCEEDED" build.log
 
       - name: Show errors if build failed
         if: failure()

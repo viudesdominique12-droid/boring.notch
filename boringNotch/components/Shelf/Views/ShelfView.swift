@@ -59,7 +59,7 @@ struct ShelfView: View {
                 ZStack {
                     ShelfBackgroundInteractionView()
                     content(quickLookService: quickLookService)
-                        .padding(compact ? 8 : nil)
+                        .padding(.all, compact ? 8 : nil)
                 }
             }
             .transaction { transaction in
