@@ -83,30 +83,62 @@ final class NotchScreenshotTap {
     }
 
     private func tapped() {
-        MaVersionLog.write("tap onNotch=\(!hovered.isEmpty) busy=\(busy)")
-        guard Defaults[.threeFingerScreenshot], !hovered.isEmpty, !busy else { return }
+        // The hover flag alone could go stale (its reset is a delayed task),
+        // so the pointer must also be inside a visible notch window.
+        let mouse = NSEvent.mouseLocation
+        let inWindow = NSApp.windows.contains {
+            $0 is BoringNotchSkyLightWindow && $0.isVisible && $0.frame.contains(mouse)
+        }
+        MaVersionLog.write("tap hovered=\(!hovered.isEmpty) inWindow=\(inWindow) busy=\(busy)")
+        guard Defaults[.threeFingerScreenshot], !hovered.isEmpty, inWindow, !busy else { return }
         busy = true
         Task { @MainActor in
-            await capture()
+            try? await Task.sleep(for: .seconds(2))
             busy = false
         }
+        Task { @MainActor in await capture() }
     }
 
     private func capture() async {
         let windows = NSApp.windows.filter { $0 is BoringNotchSkyLightWindow && $0.isVisible }
         let alphas = windows.map(\.alphaValue)
+        let restore = {
+            for (window, alpha) in zip(windows, alphas) {
+                window.alphaValue = alpha
+            }
+        }
         windows.forEach { $0.alphaValue = 0 }
+        // Brought back on a fixed delay, even if the helper never answers.
+        let restoreTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1000))
+            guard !Task.isCancelled else { return }
+            restore()
+        }
+
+        let folder = NewFilesWatcher.screenshotFolder()
+        let before = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
         // Let the window server drop the notch before the shot.
         try? await Task.sleep(for: .milliseconds(90))
         let posted = await XPCHelperClient.shared.postScreenshotShortcut()
         MaVersionLog.write("shortcut posted=\(posted)")
-        if posted {
-            try? await Task.sleep(for: .milliseconds(900))
+        guard posted else {
+            restoreTask.cancel()
+            restore()
+            askForAccessibility()
+            return
         }
-        for (window, alpha) in zip(windows, alphas) {
-            window.alphaValue = alpha
+
+        // With the floating thumbnail on, macOS writes the file only when
+        // the thumbnail goes away (about 5 s).
+        for _ in 0..<40 {
+            try? await Task.sleep(for: .milliseconds(250))
+            let now = Set((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? [])
+            if let name = now.subtracting(before).first(where: { !$0.hasPrefix(".") }) {
+                MaVersionLog.write("screenshot file: \(name)")
+                return
+            }
         }
-        if !posted { askForAccessibility() }
+        MaVersionLog.write("no new file in \(folder.path) after 10 s")
     }
 
     /// The first time, macOS's own prompt; after that, straight to the pane.
