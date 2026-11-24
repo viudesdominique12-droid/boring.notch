@@ -70,6 +70,8 @@ final class BNLunarBrightnessEvent: NSObject, NSSecureCoding {
     /// ma-version: a click from the trackpad's Taptic Engine. AppKit's
     /// haptics only play for the frontmost app, and the notch never is.
     func playHaptic(_ actuationID: Int32)
+    /// ma-version: iPhone and Apple Watch battery, as a JSON array.
+    func mobileDeviceBatteries(with reply: @escaping (Data) -> Void)
 }
 
 @objc protocol BoringNotchXPCHelperDelegate {

@@ -23,6 +23,7 @@ enum NotchPage: String, CaseIterable, Identifiable {
     case clipboard
     case shortcuts
     case system
+    case batteries
 
     var id: String { rawValue }
 
@@ -36,6 +37,7 @@ enum NotchPage: String, CaseIterable, Identifiable {
         case .clipboard: return "Copies"
         case .shortcuts: return "Apps"
         case .system: return "Système"
+        case .batteries: return "Batteries"
         }
     }
 
@@ -49,6 +51,7 @@ enum NotchPage: String, CaseIterable, Identifiable {
         case .clipboard: return "doc.on.clipboard"
         case .shortcuts: return "square.grid.2x2.fill"
         case .system: return "cpu"
+        case .batteries: return "battery.75percent"
         }
     }
 }
@@ -124,6 +127,8 @@ struct MaVersionPagesView: View {
                 ShortcutsPage()
             case .system:
                 SystemPage()
+            case .batteries:
+                BatteriesPage()
             }
         }
         .environment(\.lowNotch, lowNotch)
@@ -508,6 +513,29 @@ private struct SystemPage: View {
 
     private func sync() {
         if model.page == .system { monitor.start() } else { monitor.stop() }
+    }
+}
+
+// MARK: - Batteries
+
+/// Reads the devices only while this page is the one shown.
+private struct BatteriesPage: View {
+    @ObservedObject private var monitor = DeviceBatteryMonitor.shared
+    @ObservedObject private var model = NotchPageModel.shared
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            BatteriesPageContent(devices: monitor.devices, now: context.date)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { monitor.refresh() }
+        .onAppear { sync() }
+        .onChange(of: model.index) { sync() }
+        .onDisappear { monitor.stop() }
+    }
+
+    private func sync() {
+        if model.page == .batteries { monitor.start() } else { monitor.stop() }
     }
 }
 

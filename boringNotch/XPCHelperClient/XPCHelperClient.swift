@@ -467,6 +467,21 @@ extension XPCHelperClient {
         }
     }
 
+    /// JSON array from the helper; nil when the helper can't be reached.
+    nonisolated func mobileDeviceBatteries() async -> Data? {
+        do {
+            let service = await MainActor.run { ensureRemoteService() }
+            return try await service.withContinuation { service, continuation in
+                service.mobileDeviceBatteries { data in
+                    continuation.resume(returning: data)
+                }
+            }
+        } catch {
+            await MainActor.run { self.lastError = .transport(underlying: error) }
+            return nil
+        }
+    }
+
     nonisolated func postScreenshotShortcut() async -> Bool {
         do {
             let service = await MainActor.run { ensureRemoteService() }

@@ -1143,6 +1143,97 @@ struct SystemPageContent: View {
     }
 }
 
+// MARK: - Batteries page
+
+struct BatteriesPageContent: View {
+    let devices: [DeviceBattery]
+    var now: Date = Date()
+    @Environment(\.lowNotch) private var low
+
+    var body: some View {
+        Group {
+            if devices.isEmpty {
+                VStack(spacing: 4) {
+                    Image(systemName: "battery.75percent")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.white.opacity(0.5))
+                    Text("Aucun appareil pour l'instant")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            } else {
+                HStack(spacing: 8) {
+                    ForEach(devices) { tile($0) }
+                }
+                .padding(.horizontal, 14)
+            }
+        }
+        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight(low: low))
+    }
+
+    private var ring: CGFloat { low ? 44 : 52 }
+
+    private func color(_ device: DeviceBattery) -> Color {
+        if !device.live { return .white.opacity(0.3) }
+        if device.level <= 20 && !device.charging { return Color(red: 1, green: 0.38, blue: 0.35) }
+        return Color(red: 0.4, green: 0.85, blue: 0.5)
+    }
+
+    private func tile(_ device: DeviceBattery) -> some View {
+        VStack(spacing: low ? 4 : 6) {
+            ZStack {
+                Circle().stroke(.white.opacity(0.12), lineWidth: 5)
+                Circle()
+                    .trim(from: 0, to: Double(device.level) / 100)
+                    .stroke(color(device), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.smooth(duration: 0.6), value: device.level)
+                VStack(spacing: 1) {
+                    Image(systemName: device.symbol)
+                        .font(.system(size: low ? 10 : 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(device.live ? 0.75 : 0.4))
+                    Text("\(device.level)%")
+                        .font(.system(size: low ? 11 : 12, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white.opacity(device.live ? 1 : 0.5))
+                        .contentTransition(.numericText())
+                }
+            }
+            .frame(width: ring, height: ring)
+
+            VStack(spacing: 1) {
+                HStack(spacing: 2) {
+                    Text(device.title)
+                    if device.charging && device.live {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 8))
+                            .foregroundStyle(Color(red: 0.4, green: 0.85, blue: 0.5))
+                    }
+                }
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                Text(device.live ? device.detail : Self.age(of: device.updated, now: now))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// "à l'instant", "il y a 12 min", "il y a 3 h", "hier", "il y a 4 j".
+    static func age(of date: Date, now: Date) -> String {
+        let minutes = Int(now.timeIntervalSince(date) / 60)
+        if minutes < 1 { return "à l'instant" }
+        if minutes < 60 { return "il y a \(minutes) min" }
+        let hours = minutes / 60
+        if hours < 24 { return "il y a \(hours) h" }
+        let days = hours / 24
+        return days == 1 ? "hier" : "il y a \(days) j"
+    }
+}
+
 // MARK: - Clipboard page
 
 struct ClipboardEntry: Identifiable, Equatable {
