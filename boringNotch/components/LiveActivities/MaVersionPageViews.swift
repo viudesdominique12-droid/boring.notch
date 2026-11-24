@@ -934,6 +934,18 @@ struct EventActivityContent: View {
 enum GlanceKind: Equatable {
     case rain(start: Date)
     case device(name: String, symbol: String, battery: Int?)
+    /// A download finished and went to the Fichiers page.
+    case download(name: String)
+    /// A new screenshot went to the Fichiers page.
+    case screenshot
+
+    /// Keeps the extension visible: "cours-de-mar….pdf".
+    static func shortName(_ name: String, max: Int = 14) -> String {
+        guard name.count > max else { return name }
+        let ext = (name as NSString).pathExtension
+        let tail = ext.isEmpty ? 3 : min(ext.count + 1, 6)
+        return String(name.prefix(max - tail - 1)) + "…" + String(name.suffix(tail))
+    }
 }
 
 struct GlanceActivityContent: View {
@@ -973,6 +985,8 @@ struct GlanceActivityContent: View {
         switch kind {
         case .rain: return "umbrella.fill"
         case .device(_, let symbol, _): return symbol
+        case .download: return "arrow.down.circle.fill"
+        case .screenshot: return "camera.viewfinder"
         }
     }
 
@@ -982,6 +996,8 @@ struct GlanceActivityContent: View {
         case .device(_, _, let battery):
             if let battery, battery <= 20 { return .red }
             return .white
+        case .download: return Color(red: 0.45, green: 0.85, blue: 0.55)
+        case .screenshot: return .white
         }
     }
 
@@ -989,6 +1005,8 @@ struct GlanceActivityContent: View {
         switch kind {
         case .rain: return "Pluie"
         case .device(let name, _, _): return name
+        case .download: return "Téléchargé"
+        case .screenshot: return "Capture"
         }
     }
 
@@ -1000,7 +1018,128 @@ struct GlanceActivityContent: View {
         case .device(_, _, let battery):
             if let battery { return "\(battery)%" }
             return "Connecté"
+        case .download(let name): return GlanceKind.shortName(name)
+        case .screenshot: return "→ Fichiers"
         }
+    }
+}
+
+// MARK: - System page
+
+struct SystemStats: Equatable {
+    /// 0...1, nil until two samples exist.
+    var cpu: Double?
+    var cores: Int = ProcessInfo.processInfo.activeProcessorCount
+    var memoryUsed: Double?
+    var memoryTotal: Double = Double(ProcessInfo.processInfo.physicalMemory)
+    var batteryHealth: Int?
+    var batteryCycles: Int?
+    /// Bytes per second.
+    var down: Double?
+    var up: Double?
+}
+
+struct SystemPageContent: View {
+    let stats: SystemStats
+    @Environment(\.lowNotch) private var low
+
+    var body: some View {
+        HStack(spacing: 8) {
+            tile(title: "Processeur", sub: "\(stats.cores) cœurs", fraction: stats.cpu)
+            tile(title: "Mémoire", sub: memoryText, fraction: memoryFraction)
+            tile(title: "Batterie", sub: stats.batteryCycles.map { "\($0) cycles" } ?? "—",
+                 fraction: stats.batteryHealth.map { Double($0) / 100 }, health: true)
+            networkTile
+        }
+        .padding(.horizontal, 14)
+        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight(low: low))
+    }
+
+    private var ring: CGFloat { low ? 44 : 52 }
+
+    private var memoryFraction: Double? {
+        guard let used = stats.memoryUsed, stats.memoryTotal > 0 else { return nil }
+        return min(used / stats.memoryTotal, 1)
+    }
+
+    private var memoryText: String {
+        let total = stats.memoryTotal / 1_073_741_824
+        guard let used = stats.memoryUsed else { return "\(Int(total.rounded())) Go" }
+        return String(format: "%.1f/%d Go", used / 1_073_741_824, Int(total.rounded()))
+            .replacingOccurrences(of: ".", with: ",")
+    }
+
+    /// Load: orange from 75 %, red from 90 %. Battery health: orange under
+    /// 80 % (Apple's "service recommended" line), red under 70 %.
+    private func color(_ f: Double, health: Bool) -> Color {
+        let red = health ? f < 0.7 : f >= 0.9
+        let orange = health ? f < 0.8 : f >= 0.75
+        if red { return Color(red: 1, green: 0.38, blue: 0.35) }
+        if orange { return .orange }
+        return Color(red: 0.4, green: 0.85, blue: 0.5)
+    }
+
+    private func tile(title: String, sub: String, fraction: Double?, health: Bool = false) -> some View {
+        VStack(spacing: low ? 4 : 6) {
+            ZStack {
+                Circle().stroke(.white.opacity(0.12), lineWidth: 5)
+                if let f = fraction {
+                    Circle()
+                        .trim(from: 0, to: f)
+                        .stroke(color(f, health: health), style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.smooth(duration: 0.6), value: f)
+                }
+                Text(fraction.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+            }
+            .frame(width: ring, height: ring)
+            label(title, sub)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var networkTile: some View {
+        VStack(spacing: low ? 4 : 6) {
+            VStack(alignment: .leading, spacing: 4) {
+                rate("arrow.down", stats.down, Color(red: 0.45, green: 0.72, blue: 1.0))
+                rate("arrow.up", stats.up, Color(red: 0.4, green: 0.85, blue: 0.5))
+            }
+            .frame(height: ring)
+            label("Réseau", "par seconde")
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func rate(_ icon: String, _ value: Double?, _ tint: Color) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon).font(.system(size: 9, weight: .bold)).foregroundStyle(tint)
+            Text(value.map(Self.speed) ?? "—")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    private func label(_ title: String, _ sub: String) -> some View {
+        VStack(spacing: 1) {
+            Text(title).font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.85))
+            Text(sub).font(.system(size: 10)).foregroundStyle(.white.opacity(0.5))
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+    }
+
+    /// "820 o/s", "48 ko/s", "1,2 Mo/s".
+    static func speed(_ bytes: Double) -> String {
+        if bytes < 1000 { return "\(Int(bytes)) o/s" }
+        if bytes < 1_000_000 { return "\(Int((bytes / 1000).rounded())) ko/s" }
+        return String(format: "%.1f Mo/s", bytes / 1_000_000).replacingOccurrences(of: ".", with: ",")
     }
 }
 

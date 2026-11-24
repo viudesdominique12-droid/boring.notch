@@ -22,6 +22,7 @@ enum NotchPage: String, CaseIterable, Identifiable {
     case files
     case clipboard
     case shortcuts
+    case system
 
     var id: String { rawValue }
 
@@ -34,6 +35,7 @@ enum NotchPage: String, CaseIterable, Identifiable {
         case .files: return "Fichiers"
         case .clipboard: return "Copies"
         case .shortcuts: return "Apps"
+        case .system: return "Système"
         }
     }
 
@@ -46,6 +48,7 @@ enum NotchPage: String, CaseIterable, Identifiable {
         case .files: return "tray.and.arrow.down.fill"
         case .clipboard: return "doc.on.clipboard"
         case .shortcuts: return "square.grid.2x2.fill"
+        case .system: return "cpu"
         }
     }
 }
@@ -119,6 +122,8 @@ struct MaVersionPagesView: View {
                 ClipboardPage()
             case .shortcuts:
                 ShortcutsPage()
+            case .system:
+                SystemPage()
             }
         }
         .environment(\.lowNotch, lowNotch)
@@ -469,6 +474,25 @@ private struct ClipboardPage: View {
                 onClear: { history.clear() }
             )
         }
+    }
+}
+
+// MARK: - System
+
+/// Samples CPU, memory and network only while this page is the one shown.
+private struct SystemPage: View {
+    @ObservedObject private var monitor = SystemStatsMonitor.shared
+    @ObservedObject private var model = NotchPageModel.shared
+
+    var body: some View {
+        SystemPageContent(stats: monitor.stats)
+            .onAppear { sync() }
+            .onChange(of: model.index) { sync() }
+            .onDisappear { monitor.stop() }
+    }
+
+    private func sync() {
+        if model.page == .system { monitor.start() } else { monitor.stop() }
     }
 }
 

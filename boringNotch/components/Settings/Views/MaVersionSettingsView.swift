@@ -40,7 +40,7 @@ struct MaVersionSettingsView: View {
             } header: {
                 Text("Agencement")
             } footer: {
-                Text("Glisse à deux doigts sur l'encoche ouverte : Musique → Météo → Agenda → Minuteur → Fichiers → Copies → Apps. Doigts vers la gauche = page suivante, comme sur iPhone. Tu peux aussi cliquer sur les petits points.")
+                Text("Glisse à deux doigts sur l'encoche ouverte : Musique → Météo → Agenda → Minuteur → Fichiers → Copies → Apps → Système. Doigts vers la gauche = page suivante, comme sur iPhone. Tu peux aussi cliquer sur les petits points.")
                     .foregroundStyle(.secondary)
             }
 
@@ -52,6 +52,16 @@ struct MaVersionSettingsView: View {
                 Defaults.Toggle(key: .pageHaptics) { Text("Petit clic au trackpad à chaque page") }
             } header: {
                 Text("Animations")
+            }
+
+            Section {
+                Defaults.Toggle(key: .screenshotsToShelf) { Text("Nouvelles captures d'écran dans Fichiers") }
+                Defaults.Toggle(key: .downloadsToShelf) { Text("Téléchargements terminés : alerte + Fichiers") }
+            } header: {
+                Text("Fichiers automatiques")
+            } footer: {
+                Text("macOS peut te demander une fois l'accès au Bureau et aux Téléchargements : clique sur Autoriser.")
+                    .foregroundStyle(.secondary)
             }
 
             Section {

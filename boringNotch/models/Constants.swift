@@ -539,6 +539,10 @@ extension Defaults.Keys {
     static let invertPageSwipe = Key<Bool>("invertPageSwipe", default: false)
     /// Open mini notch 150 pt tall instead of 204 (pages 104 pt, dots in the bottom margin).
     static let lowOpenNotch = Key<Bool>("lowOpenNotch", default: true)
+    /// New screenshots go to the Fichiers page (with a short glance).
+    static let screenshotsToShelf = Key<Bool>("screenshotsToShelf", default: true)
+    /// Finished downloads go to the Fichiers page with a "Téléchargé" glance.
+    static let downloadsToShelf = Key<Bool>("downloadsToShelf", default: true)
     /// Liquid Glass background for the opened notch (macOS 26+). Closed notch stays black.
     static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
     /// How much black is mixed into the glass, so white text stays readable.
