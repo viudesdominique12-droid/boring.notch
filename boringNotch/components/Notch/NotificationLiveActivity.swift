@@ -68,6 +68,58 @@ struct NotificationLiveActivity: View {
     }
 }
 
+/// ma-version: sender and start of the message under the closed notch, so a
+/// notification can be read without hovering.
+struct NotificationPreviewRow: View {
+    let notification: SystemNotification
+    /// Width of the closed activity row above, to line up with it.
+    let width: CGFloat
+
+    static func heading(_ notification: SystemNotification) -> String? {
+        if let title = notification.title, !title.isEmpty, title != notification.appName { return title }
+        return notification.appName
+    }
+
+    static func message(_ notification: SystemNotification) -> String? {
+        let parts = [notification.subtitle, notification.body]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " — ")
+    }
+
+    static func hasText(_ notification: SystemNotification) -> Bool {
+        heading(notification) != nil || message(notification) != nil
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let heading = Self.heading(notification) {
+                Text(heading)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
+            if let message = Self.message(notification) {
+                Text(message)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.white.opacity(0.75))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(width: max(width, 160), alignment: .leading)
+        .padding(.top, 2)
+        .padding(.bottom, 10)
+        .onAppear {
+            // Lengths only: the text itself never goes to disk.
+            MaVersionLog.write(
+                "notification preview: heading=\(Self.heading(notification)?.count ?? 0) message=\(Self.message(notification)?.count ?? 0) width=\(Int(width))"
+            )
+        }
+    }
+}
+
 struct NotificationExpandedView: View {
     @ObservedObject private var manager = SystemNotificationManager.shared
     let notification: SystemNotification

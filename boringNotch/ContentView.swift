@@ -24,6 +24,9 @@ struct ContentView: View {
     @ObservedObject var notificationManager = SystemNotificationManager.shared
     /// Which entry of the closed-notch activity stack is on top.
     @State private var activityIndex: Int = 0
+    /// ma-version: width of the closed activity row, so the notification
+    /// preview under it lines up exactly.
+    @State private var closedActivityWidth: CGFloat = 0
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var anyDropDebounceTask: Task<Void, Never>?
@@ -213,6 +216,16 @@ struct ContentView: View {
         let items = liveActivities
         guard !items.isEmpty else { return nil }
         return items[min(max(activityIndex, 0), items.count - 1)]
+    }
+
+    /// ma-version: the notification whose text shows under the closed notch.
+    private var notificationPreview: SystemNotification? {
+        guard vm.notchState == .closed, !vm.hideOnClosed,
+              case .activities = closedNotchContent,
+              case .notification(let notification)? = selectedActivity,
+              NotificationPreviewRow.hasText(notification)
+        else { return nil }
+        return notification
     }
 
     private enum ClosedNotchContent: Equatable {
@@ -620,6 +633,13 @@ struct ContentView: View {
                                       .frame(alignment: .center)
                               }
                           }
+                          .background {
+                              GeometryReader { geo in
+                                  Color.clear
+                                      .onAppear { closedActivityWidth = geo.size.width }
+                                      .onChange(of: geo.size.width) { _, width in closedActivityWidth = width }
+                              }
+                          }
                       } else if showsClosedStatus {
                           MaVersionClosedStatus(
                               notchWidth: vm.closedNotchSize.width,
@@ -688,6 +708,14 @@ struct ContentView: View {
                                    .padding(.bottom, 10)
                                }
                            }
+                       }
+
+                       // ma-version: the message itself under the closed
+                       // notch, like a banner dropping out of the Dynamic
+                       // Island. Hovering still opens the full view.
+                       if let notification = notificationPreview, closedActivityWidth > 0 {
+                           NotificationPreviewRow(notification: notification, width: closedActivityWidth)
+                               .transition(.opacity.combined(with: .move(edge: .top)))
                        }
                         }
                       }
