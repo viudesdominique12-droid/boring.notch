@@ -43,7 +43,11 @@ struct CompactHomeView: View {
     @Default(.showRemainingTime) private var showRemainingTime
     @Default(.showMediaSourceAppIcon) private var showMediaSourceAppIcon
 
-    private let albumArtWidth: CGFloat = 45
+    /// ma-version: low open notch (104 pt pages) squeezes the player:
+    /// 2 + 38 art + 32 progress + 32 transport = 104.
+    @Environment(\.lowNotch) private var low
+
+    private var albumArtWidth: CGFloat { low ? 38 : 45 }
     private let headerSpacing: CGFloat = 10
     /// Matches the trailing time label's width in the row below, so the
     /// visualizer's bars sit centred over "-0:00" rather than drifting.
@@ -60,10 +64,10 @@ struct CompactHomeView: View {
                 .frame(height: albumArtWidth)
 
             progressRow
-                .padding(.top, 6)
+                .padding(.top, low ? 0 : 6)
 
             transport
-                .padding(.top, 2)
+                .padding(.top, low ? 0 : 2)
         }
         .padding(.horizontal, 12)
         // Atoll's 15/3 formula assumes the player is the whole panel; here
@@ -71,8 +75,8 @@ struct CompactHomeView: View {
         // land the panel at the intended overall height. The 2pt bottom pad
         // keeps the play/pause's hover fill from kissing the rounded corner
         // without adding a visible band of empty space.
-        .padding(.top, 4)
-        .padding(.bottom, 2)
+        .padding(.top, low ? 2 : 4)
+        .padding(.bottom, low ? 0 : 2)
         .frame(maxWidth: .infinity)
         .buttonStyle(PlainButtonStyle())
     }
@@ -160,8 +164,8 @@ struct CompactHomeView: View {
                 onValueChange: { MusicManager.shared.seek(to: $0) },
                 trailingLabel: showRemainingTime ? .remaining : .duration
             )
-            .padding(.top, 5)
-            .frame(height: 36)
+            .padding(.top, low ? 0 : 5)
+            .frame(height: low ? 32 : 36)
         }
         .onAppear { sliderValue = musicManager.elapsedTime }
     }
@@ -192,6 +196,9 @@ struct CompactHomeView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
+        // Buttons are 40/30 pt; at 80 % the row is 32 pt.
+        .scaleEffect(low ? 0.8 : 1)
+        .frame(height: low ? 32 : nil)
     }
 
     private var compactAlbumArt: some View {

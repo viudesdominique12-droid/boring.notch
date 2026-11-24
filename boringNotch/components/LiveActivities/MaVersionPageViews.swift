@@ -25,11 +25,27 @@ extension EnvironmentValues {
     }
 }
 
+/// Low open notch: pages are 104 pt instead of 136 and the page dots sit in
+/// the panel's bottom margin, so the open notch is 150 pt tall, not 204.
+private struct LowNotchKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var lowNotch: Bool {
+        get { self[LowNotchKey.self] }
+        set { self[LowNotchKey.self] = newValue }
+    }
+}
+
 enum MaVersionMetrics {
     /// Content width of the open mini notch (same as upstream compact mode).
     static let pageWidth: CGFloat = 336
     /// Every page gets the same height so the panel never jumps while swiping.
     static let pageHeight: CGFloat = 136
+    static let lowPageHeight: CGFloat = 104
+
+    static func pageHeight(low: Bool) -> CGFloat { low ? lowPageHeight : pageHeight }
 }
 
 // MARK: - Weather values
@@ -185,6 +201,7 @@ struct WeatherPageContent: View {
     let state: WeatherPageState
     var now: Date = Date()
     var animated: Bool = true
+    @Environment(\.lowNotch) private var low
 
     var body: some View {
         Group {
@@ -208,16 +225,17 @@ struct WeatherPageContent: View {
                             subtitle: "Clique pour réessayer")
             }
         }
-        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight, alignment: .top)
+        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight(low: low), alignment: .top)
     }
 
     private func loaded(_ s: WeatherSnapshot) -> some View {
-        VStack(spacing: 8) {
+        // Low notch: 2 + 34 + 4 + 42 + 4 + 18 = 104.
+        VStack(spacing: low ? 4 : 8) {
             HStack(alignment: .center, spacing: 10) {
-                AnimatedWeatherSymbol(code: s.code, isDay: s.isDay, size: 30, animated: animated)
-                    .frame(width: 38, height: 38)
+                AnimatedWeatherSymbol(code: s.code, isDay: s.isDay, size: low ? 26 : 30, animated: animated)
+                    .frame(width: low ? 32 : 38, height: low ? 32 : 38)
                 Text(WeatherCondition.temperatureText(s.temperature))
-                    .font(.system(size: 34, weight: .semibold, design: .rounded))
+                    .font(.system(size: low ? 28 : 34, weight: .semibold, design: .rounded))
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
                 VStack(alignment: .leading, spacing: 2) {
@@ -233,11 +251,11 @@ struct WeatherPageContent: View {
                 }
                 Spacer(minLength: 0)
             }
-            .frame(height: 40)
+            .frame(height: low ? 34 : 40)
 
             HStack(spacing: 0) {
                 ForEach(s.hours) { hour in
-                    VStack(spacing: 3) {
+                    VStack(spacing: low ? 2 : 3) {
                         Text(Self.hourLabel(hour.date, in: s.timeZone))
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.white.opacity(0.55))
@@ -252,12 +270,12 @@ struct WeatherPageContent: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            .frame(height: 46)
+            .frame(height: low ? 42 : 46)
 
             rainRow(s.rain, timeZone: s.timeZone)
         }
         .padding(.horizontal, 14)
-        .padding(.top, 6)
+        .padding(.top, low ? 2 : 6)
     }
 
     @ViewBuilder
@@ -270,7 +288,7 @@ struct WeatherPageContent: View {
             }
             .foregroundStyle(highlight ? Color(red: 0.55, green: 0.78, blue: 1.0) : .white.opacity(0.55))
             .padding(.horizontal, 9)
-            .padding(.vertical, 3)
+            .padding(.vertical, low ? 2 : 3)
             .background(Capsule().fill(.white.opacity(highlight ? 0.12 : 0.06)))
         }
     }
@@ -327,6 +345,7 @@ enum AgendaPageState: Equatable {
 struct AgendaPageContent: View {
     let state: AgendaPageState
     var now: Date = Date()
+    @Environment(\.lowNotch) private var low
 
     var body: some View {
         Group {
@@ -338,25 +357,26 @@ struct AgendaPageContent: View {
                 PageMessage(icon: "calendar.badge.checkmark", title: "Rien de prévu",
                             subtitle: "Plus aucun événement aujourd'hui")
             case .loaded(let items):
-                VStack(alignment: .leading, spacing: 6) {
+                // Low notch: 4 + 3 × 29 + 2 × 4 = 99.
+                VStack(alignment: .leading, spacing: low ? 4 : 6) {
                     ForEach(items.prefix(3)) { item in
                         row(item)
                     }
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 14)
-                .padding(.top, 6)
+                .padding(.top, low ? 4 : 6)
             }
         }
-        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight, alignment: .top)
+        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight(low: low), alignment: .top)
     }
 
     private func row(_ item: AgendaItem) -> some View {
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 2)
                 .fill(item.color)
-                .frame(width: 4, height: 30)
-            VStack(alignment: .leading, spacing: 1) {
+                .frame(width: 4, height: low ? 26 : 30)
+            VStack(alignment: .leading, spacing: low ? 0 : 1) {
                 Text(item.title)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
@@ -373,7 +393,7 @@ struct AgendaPageContent: View {
                 .padding(.vertical, 3)
                 .background(Capsule().fill(.white.opacity(0.08)))
         }
-        .frame(height: 34)
+        .frame(height: low ? 29 : 34)
     }
 
     private func isOngoing(_ item: AgendaItem) -> Bool {
@@ -435,11 +455,12 @@ struct TimerPageContent: View {
     var onReset: () -> Void = {}
     var onSelect: (FocusMode) -> Void = { _ in }
     var onAdjustCustom: (Int) -> Void = { _ in }
+    @Environment(\.lowNotch) private var low
 
     var body: some View {
         HStack(spacing: 18) {
             ring
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: low ? 8 : 10) {
                 HStack(spacing: 6) {
                     ForEach(FocusMode.allCases) { m in
                         Button { onSelect(m) } label: {
@@ -467,7 +488,7 @@ struct TimerPageContent: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 16)
-        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight)
+        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight(low: low))
     }
 
     private func chipLabel(_ m: FocusMode) -> String {
@@ -500,7 +521,7 @@ struct TimerPageContent: View {
                     .foregroundStyle(.white.opacity(0.55))
             }
         }
-        .frame(width: 96, height: 96)
+        .frame(width: low ? 86 : 96, height: low ? 86 : 96)
     }
 
     private func circleButton(_ icon: String, prominent: Bool, action: @escaping () -> Void) -> some View {
@@ -531,6 +552,7 @@ struct ShortcutAppItem: Identifiable {
 struct ShortcutsPageContent: View {
     let apps: [ShortcutAppItem]
     var onOpen: (Int) -> Void = { _ in }
+    @Environment(\.lowNotch) private var low
 
     var body: some View {
         HStack(spacing: 14) {
@@ -560,7 +582,7 @@ struct ShortcutsPageContent: View {
                 .buttonStyle(ShortcutPressStyle())
             }
         }
-        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight)
+        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight(low: low))
     }
 }
 
@@ -998,6 +1020,7 @@ struct ClipboardPageContent: View {
     var onClear: () -> Void = {}
 
     @State private var copiedID: UUID?
+    @Environment(\.lowNotch) private var low
 
     var body: some View {
         Group {
@@ -1008,8 +1031,9 @@ struct ClipboardPageContent: View {
                 PageMessage(icon: "doc.on.clipboard", title: "Rien de copié",
                             subtitle: "Les textes que tu copies apparaîtront ici")
             } else {
+                // Low notch: 2 + 3 × 25 + 3 × 4 + 13 = 102.
                 VStack(spacing: 4) {
-                    ForEach(entries.prefix(4)) { entry in
+                    ForEach(entries.prefix(low ? 3 : 4)) { entry in
                         Button {
                             onCopy(entry)
                             copiedID = entry.id
@@ -1048,10 +1072,10 @@ struct ClipboardPageContent: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 4)
+                .padding(.top, low ? 2 : 4)
             }
         }
-        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight, alignment: .top)
+        .frame(width: MaVersionMetrics.pageWidth, height: MaVersionMetrics.pageHeight(low: low), alignment: .top)
     }
 
     static func ago(_ date: Date, now: Date) -> String {
@@ -1214,18 +1238,20 @@ struct SwipePager<Page: View>: View {
     @State private var drag: CGFloat = 0
     /// The detent click already fired for this swipe.
     @State private var clicked = false
+    @Environment(\.lowNotch) private var low
     private let width = MaVersionMetrics.pageWidth
     /// Distance at which a release turns the page.
     private let threshold: CGFloat = 40
 
     var body: some View {
+        let height = MaVersionMetrics.pageHeight(low: low)
         VStack(spacing: 6) {
             HStack(spacing: 0) {
                 ForEach(0..<count, id: \.self) { i in
                     // 0 = centred, 1 = a full page away (follows the drag).
                     let distance = depthEffect ? min(abs(CGFloat(i - index) + drag / width), 1) : 0
                     page(i)
-                        .frame(width: width, height: MaVersionMetrics.pageHeight)
+                        .frame(width: width, height: height)
                         .scaleEffect(1 - 0.16 * distance)
                         .opacity(1 - 0.6 * Double(distance))
                         .blur(radius: 3 * distance)
@@ -1233,7 +1259,7 @@ struct SwipePager<Page: View>: View {
                 }
             }
             .offset(x: -CGFloat(index) * width + drag)
-            .frame(width: width, height: MaVersionMetrics.pageHeight, alignment: .leading)
+            .frame(width: width, height: height, alignment: .leading)
             .clipped()
             .contentShape(Rectangle())
             .background(
@@ -1266,10 +1292,19 @@ struct SwipePager<Page: View>: View {
                 )
             )
 
-            PageDots(count: count, index: index) { i in
-                if i != index { tick() }
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) { index = i }
-            }
+            if !low { dots }
+        }
+        // Low notch: the dots sit in the panel's 12 pt bottom margin
+        // instead of adding a row under the pages.
+        .overlay(alignment: .bottom) {
+            if low { dots.offset(y: 11) }
+        }
+    }
+
+    private var dots: some View {
+        PageDots(count: count, index: index) { i in
+            if i != index { tick() }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) { index = i }
         }
     }
 

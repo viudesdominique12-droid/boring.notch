@@ -34,6 +34,9 @@ struct MaVersionSettingsView: View {
                 Defaults.Toggle(key: .invertPageSwipe) {
                     Text("Inverser le sens du glissement")
                 }
+                Defaults.Toggle(key: .lowOpenNotch) {
+                    Text("Encoche ouverte basse (150 pt au lieu de 204)")
+                }
             } header: {
                 Text("Agencement")
             } footer: {

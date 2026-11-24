@@ -87,6 +87,7 @@ struct MaVersionPagesView: View {
     @Default(.pageDepthEffect) private var depthEffect
     @Default(.pageHaptics) private var haptics
     @Default(.invertPageSwipe) private var invertSwipe
+    @Default(.lowOpenNotch) private var lowNotch
 
     var body: some View {
         SwipePager(
@@ -113,13 +114,14 @@ struct MaVersionPagesView: View {
                 ShelfView(dropInteraction: vm.dropInteraction, animation: vm.animation)
                     .environment(\.compactShelf, true)
                     .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, lowNotch ? 2 : 4)
             case .clipboard:
                 ClipboardPage()
             case .shortcuts:
                 ShortcutsPage()
             }
         }
+        .environment(\.lowNotch, lowNotch)
         .onDisappear { model.notchDidClose() }
     }
 }

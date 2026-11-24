@@ -42,6 +42,7 @@ struct ContentView: View {
     @Default(.liquidGlassTint) var liquidGlassTint
     @Default(.pagedLayout) var pagedLayout
     @Default(.bouncyOpen) var bouncyOpen
+    @Default(.lowOpenNotch) var lowOpenNotch
     @ObservedObject var focusTimer = FocusTimer.shared
     @ObservedObject var glanceCenter = GlanceCenter.shared
     @ObservedObject var upcomingEvents = UpcomingEventMonitor.shared
@@ -531,7 +532,8 @@ struct ContentView: View {
     func NotchLayout() -> some View {
         @Bindable var dropInteraction = vm.dropInteraction
 
-        VStack(alignment: .leading) {
+        // Low open notch: 2 pt between the top bar and the pages (32 + 2 + 104 + 12 = 150).
+        VStack(alignment: .leading, spacing: pagedLayout && lowOpenNotch && vm.notchState == .open ? 2 : nil) {
             VStack(alignment: .leading) {
                 if coordinator.helloAnimationRunning {
                     Spacer()
