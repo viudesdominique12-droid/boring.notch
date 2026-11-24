@@ -456,8 +456,13 @@ struct ContentView: View {
                         // ma-version: show the full message as it arrives.
                         if newID != nil {
                             if Defaults[.notificationAutoOpen], vm.notchState == .closed,
-                               !coordinator.helloAnimationRunning, doOpen() {
-                                openedForNotification = true
+                               !coordinator.helloAnimationRunning {
+                                notificationManager.openedAutomatically = true
+                                if doOpen() {
+                                    openedForNotification = true
+                                } else {
+                                    notificationManager.openedAutomatically = false
+                                }
                             }
                         } else if openedForNotification {
                             openedForNotification = false
@@ -474,7 +479,10 @@ struct ContentView: View {
                     // ma-version: opening the notch from the timer activity
                     // lands on the Minuteur page, like tapping a Live Activity.
                     .onChange(of: vm.notchState) { _, state in
-                        if state == .closed { openedForNotification = false }
+                        if state == .closed {
+                            openedForNotification = false
+                            notificationManager.openedAutomatically = false
+                        }
                         guard state == .open, pagedLayout else { return }
                         var page: NotchPage?
                         if selectedActivity == .timer { page = .timer }

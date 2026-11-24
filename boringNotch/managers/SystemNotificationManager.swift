@@ -22,6 +22,10 @@ final class SystemNotificationManager: ObservableObject {
 
     @Published private(set) var activeNotification: SystemNotification?
     @Published private(set) var queuedNotifications: [SystemNotification] = []
+    /// ma-version: the notch opened by itself for this notification, so the
+    /// message view appearing doesn't mean the user is reading it — the
+    /// countdown keeps running until the pointer actually comes over.
+    var openedAutomatically = false
 
     private let queueLimit = 5
     private let displayDuration: TimeInterval = 8

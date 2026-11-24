@@ -202,7 +202,7 @@ struct NotificationExpandedView: View {
             }
             .padding(.trailing, 4)
         }
-        .onAppear { manager.holdActive() }
+        .onAppear { if !manager.openedAutomatically { manager.holdActive() } }
         .onDisappear { manager.resumeDismiss() }
     }
 
