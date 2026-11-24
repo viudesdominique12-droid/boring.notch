@@ -13,6 +13,7 @@ import ApplicationServices
 import CoreGraphics
 import Darwin
 import Foundation
+import IOKit
 
 extension BoringNotchXPCHelper {
     @objc func startTouchWatching(with reply: @escaping (Bool) -> Void) {
@@ -41,6 +42,71 @@ extension BoringNotchXPCHelper {
             return
         }
         reply(ScreenshotShortcut.post())
+    }
+
+    @objc func playHaptic(_ actuationID: Int32) {
+        TrackpadHaptics.shared.play(actuationID)
+    }
+}
+
+/// Drives the Force Touch trackpad's actuator directly (MultitouchSupport's
+/// MTActuator, as HapticKey does), which works from a background process.
+final class TrackpadHaptics: @unchecked Sendable {
+    static let shared = TrackpadHaptics()
+
+    private typealias CreateFromID = @convention(c) (UInt64) -> Unmanaged<CFTypeRef>?
+    private typealias Open = @convention(c) (CFTypeRef) -> Int32
+    private typealias Actuate = @convention(c) (CFTypeRef, Int32, UInt32, Float, Float) -> Int32
+
+    private let queue = DispatchQueue(label: "ma-version.haptics")
+    private var actuator: CFTypeRef?
+    private var actuate: Actuate?
+    /// Only when the framework itself can't be loaded.
+    private var failed = false
+
+    private init() {}
+
+    func play(_ actuationID: Int32) {
+        queue.async { [self] in
+            guard let actuator = actuator ?? open(), let actuate else { return }
+            if actuate(actuator, actuationID, 0, 1.0, 2.0) != 0 {
+                // The trackpad may have gone away (sleep, Bluetooth pad):
+                // reopen next time.
+                self.actuator = nil
+            }
+        }
+    }
+
+    private func open() -> CFTypeRef? {
+        guard !failed else { return nil }
+        let path = "/System/Library/PrivateFrameworks/MultitouchSupport.framework/MultitouchSupport"
+        guard let handle = dlopen(path, RTLD_NOW),
+              let createSymbol = dlsym(handle, "MTActuatorCreateFromDeviceID"),
+              let openSymbol = dlsym(handle, "MTActuatorOpen"),
+              let actuateSymbol = dlsym(handle, "MTActuatorActuate") else {
+            failed = true
+            return nil
+        }
+        let create = unsafeBitCast(createSymbol, to: CreateFromID.self)
+        let openActuator = unsafeBitCast(openSymbol, to: Open.self)
+        actuate = unsafeBitCast(actuateSymbol, to: Actuate.self)
+
+        var iterator: io_iterator_t = 0
+        guard IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("AppleMultitouchDevice"), &iterator) == KERN_SUCCESS else {
+            return nil
+        }
+        defer { IOObjectRelease(iterator) }
+        while case let service = IOIteratorNext(iterator), service != 0 {
+            defer { IOObjectRelease(service) }
+            guard let id = IORegistryEntryCreateCFProperty(service, "Multitouch ID" as CFString, kCFAllocatorDefault, 0)?
+                    .takeRetainedValue() as? NSNumber,
+                  let candidate = create(id.uint64Value)?.takeRetainedValue(),
+                  openActuator(candidate) == 0 else { continue }
+            actuator = candidate
+            return candidate
+        }
+        NSLog("[boringNotch] no trackpad actuator found")
+        return nil
     }
 }
 

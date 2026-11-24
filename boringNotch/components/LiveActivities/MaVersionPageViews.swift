@@ -1450,7 +1450,9 @@ struct SwipePager<Page: View>: View {
     /// A light click on the trackpad, like a detent.
     private func tick() {
         guard haptics else { return }
-        NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
+        // AppKit haptics only play for the frontmost app; the helper drives
+        // the trackpad directly.
+        XPCHelperClient.shared.playHaptic()
     }
 
     private func rubberBand(_ offset: CGFloat) -> CGFloat {

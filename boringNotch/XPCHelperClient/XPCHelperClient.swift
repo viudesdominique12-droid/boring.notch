@@ -459,6 +459,14 @@ extension XPCHelperClient {
         }
     }
 
+    /// Fire and forget: a trackpad click for page changes.
+    func playHaptic(_ actuationID: Int32 = 6) {
+        let service = ensureRemoteService()
+        Task {
+            try? await service.withService { $0.playHaptic(actuationID) }
+        }
+    }
+
     nonisolated func postScreenshotShortcut() async -> Bool {
         do {
             let service = await MainActor.run { ensureRemoteService() }

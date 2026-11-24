@@ -67,6 +67,9 @@ final class BNLunarBrightnessEvent: NSObject, NSSecureCoding {
     func stopTouchWatching()
     func touchWatchingDiagnostics(with reply: @escaping (String) -> Void)
     func postScreenshotShortcut(with reply: @escaping (Bool) -> Void)
+    /// ma-version: a click from the trackpad's Taptic Engine. AppKit's
+    /// haptics only play for the frontmost app, and the notch never is.
+    func playHaptic(_ actuationID: Int32)
 }
 
 @objc protocol BoringNotchXPCHelperDelegate {
