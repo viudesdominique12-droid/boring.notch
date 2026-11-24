@@ -27,6 +27,9 @@ struct ContentView: View {
     /// ma-version: width of the closed activity row, so the notification
     /// preview under it lines up exactly.
     @State private var closedActivityWidth: CGFloat = 0
+    /// ma-version: the notch is open because a notification arrived, so it
+    /// closes again when the notification goes (unless the pointer is on it).
+    @State private var openedForNotification = false
     @State private var hoverTask: Task<Void, Never>?
     @State private var isHovering: Bool = false
     @State private var anyDropDebounceTask: Task<Void, Never>?
@@ -450,6 +453,19 @@ struct ContentView: View {
                     // even if the user had swiped away to music.
                     .onChange(of: notificationManager.activeNotification?.id) { _, newID in
                         if newID != nil { activityIndex = 0 }
+                        // ma-version: show the full message as it arrives.
+                        if newID != nil {
+                            if Defaults[.notificationAutoOpen], vm.notchState == .closed,
+                               !coordinator.helloAnimationRunning, doOpen() {
+                                openedForNotification = true
+                            }
+                        } else if openedForNotification {
+                            openedForNotification = false
+                            if vm.notchState == .open, !isHovering, !vm.isPopoverActive,
+                               !SharingStateManager.shared.preventNotchClose {
+                                vm.close()
+                            }
+                        }
                     }
                     // Activities disappear on their own (a notification
                     // expires, music stops). Keep the selection in range so
@@ -458,6 +474,7 @@ struct ContentView: View {
                     // ma-version: opening the notch from the timer activity
                     // lands on the Minuteur page, like tapping a Live Activity.
                     .onChange(of: vm.notchState) { _, state in
+                        if state == .closed { openedForNotification = false }
                         guard state == .open, pagedLayout else { return }
                         var page: NotchPage?
                         if selectedActivity == .timer { page = .timer }

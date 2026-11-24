@@ -80,6 +80,7 @@ struct MaVersionSettingsView: View {
                 Defaults.Toggle(key: .upcomingEventAlert) { Text("Rendez-vous dans moins de 10 min") }
                 Defaults.Toggle(key: .rainAlert) { Text("Pluie qui arrive (dans 20 min ou moins)") }
                 Defaults.Toggle(key: .deviceAlert) { Text("Écouteurs Bluetooth connectés, avec batterie") }
+                Defaults.Toggle(key: .notificationAutoOpen) { Text("Notifications : ouvrir l'encoche sur le message") }
             } header: {
                 Text("Alertes dans l'encoche fermée")
             }
