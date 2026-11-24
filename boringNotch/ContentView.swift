@@ -1039,6 +1039,7 @@ extension ContentView {
             withAnimation(animationSpring) {
                 isHovering = true
             }
+            NotchScreenshotTap.shared.setHovering(true, id: ObjectIdentifier(vm))
 
             // Freeze the dismiss countdown the moment the pointer arrives,
             // not when the notch finishes opening. Opening waits out
@@ -1080,6 +1081,7 @@ extension ContentView {
                     withAnimation(animationSpring) {
                         self.isHovering = false
                     }
+                    NotchScreenshotTap.shared.setHovering(false, id: ObjectIdentifier(self.vm))
 
                     // Pointer left — let the notification age out again.
                     self.notificationManager.resumeDismiss()

@@ -60,10 +60,18 @@ final class BNLunarBrightnessEvent: NSObject, NSSecureCoding {
     func startNotificationWatching(with reply: @escaping (Bool) -> Void)
     func stopNotificationWatching()
     func setNotificationFilter(_ bundleIDs: [String], allApps: Bool)
+
+    // ma-version: a three-finger tap on the notch takes a screenshot. The
+    // helper isn't sandboxed, so it reads the trackpad and posts ⌘⇧3.
+    func startTouchWatching(with reply: @escaping (Bool) -> Void)
+    func stopTouchWatching()
+    func touchWatchingDiagnostics(with reply: @escaping (String) -> Void)
+    func postScreenshotShortcut(with reply: @escaping (Bool) -> Void)
 }
 
 @objc protocol BoringNotchXPCHelperDelegate {
     func notificationDidAppear(_ payload: [String: String])
+    func threeFingerTapDetected()
 }
 
 @objc protocol BoringNotchXPCAppDelegate: BoringNotchXPCHelperLunarListener, BoringNotchXPCHelperDelegate {}

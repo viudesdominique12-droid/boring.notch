@@ -411,6 +411,67 @@ final class NotificationXPCDelegate: NSObject, BoringNotchXPCAppDelegate {
             name: .systemNotificationDidAppear, object: nil, userInfo: payload
         )
     }
+
+    func threeFingerTapDetected() {
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .maVersionThreeFingerTap, object: nil)
+        }
+    }
+}
+
+// MARK: - ma-version: three-finger tap screenshot
+
+extension XPCHelperClient {
+    nonisolated func startTouchWatching() async -> Bool {
+        do {
+            let service = await MainActor.run { ensureRemoteService() }
+            return try await service.withContinuation { service, continuation in
+                service.startTouchWatching { started in
+                    continuation.resume(returning: started)
+                }
+            }
+        } catch {
+            await MainActor.run { self.lastError = .transport(underlying: error) }
+            return false
+        }
+    }
+
+    nonisolated func stopTouchWatching() async {
+        do {
+            let service = await MainActor.run { ensureRemoteService() }
+            try await service.withService { $0.stopTouchWatching() }
+        } catch {
+            await MainActor.run { self.lastError = .transport(underlying: error) }
+        }
+    }
+
+    nonisolated func touchWatchingDiagnostics() async -> String {
+        do {
+            let service = await MainActor.run { ensureRemoteService() }
+            return try await service.withContinuation { service, continuation in
+                service.touchWatchingDiagnostics { text in
+                    continuation.resume(returning: text)
+                }
+            }
+        } catch {
+            await MainActor.run { self.lastError = .transport(underlying: error) }
+            return "helper unreachable: \(error.localizedDescription)"
+        }
+    }
+
+    nonisolated func postScreenshotShortcut() async -> Bool {
+        do {
+            let service = await MainActor.run { ensureRemoteService() }
+            return try await service.withContinuation { service, continuation in
+                service.postScreenshotShortcut { posted in
+                    continuation.resume(returning: posted)
+                }
+            }
+        } catch {
+            await MainActor.run { self.lastError = .transport(underlying: error) }
+            return false
+        }
+    }
 }
 
 extension XPCHelperClient {

@@ -65,6 +65,18 @@ struct MaVersionSettingsView: View {
             }
 
             Section {
+                Defaults.Toggle(key: .threeFingerScreenshot) { Text("Toucher l'encoche avec 3 doigts : capture d'écran") }
+                Button("Autoriser l'Accessibilité…") {
+                    NotchScreenshotTap.shared.askForAccessibility()
+                }
+            } header: {
+                Text("Capture d'écran")
+            } footer: {
+                Text("Curseur sur l'encoche, touche le trackpad avec 3 doigts sans appuyer : l'encoche se cache et macOS prend la capture (⌘⇧3). Il faut autoriser Boring Notch dans Réglages → Confidentialité et sécurité → Accessibilité.")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Defaults.Toggle(key: .upcomingEventAlert) { Text("Rendez-vous dans moins de 10 min") }
                 Defaults.Toggle(key: .rainAlert) { Text("Pluie qui arrive (dans 20 min ou moins)") }
                 Defaults.Toggle(key: .deviceAlert) { Text("Écouteurs Bluetooth connectés, avec batterie") }

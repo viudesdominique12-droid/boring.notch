@@ -543,6 +543,7 @@ extension Defaults.Keys {
     static let screenshotsToShelf = Key<Bool>("screenshotsToShelf", default: true)
     /// Finished downloads go to the Fichiers page with a "Téléchargé" glance.
     static let downloadsToShelf = Key<Bool>("downloadsToShelf", default: true)
+    static let threeFingerScreenshot = Key<Bool>("threeFingerScreenshot", default: true)
     /// Liquid Glass background for the opened notch (macOS 26+). Closed notch stays black.
     static let liquidGlassNotch = Key<Bool>("liquidGlassNotch", default: true)
     /// How much black is mixed into the glass, so white text stays readable.

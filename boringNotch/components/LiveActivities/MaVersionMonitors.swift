@@ -29,6 +29,7 @@ enum MaVersionMonitors {
         HeadphonesWatcher.shared.start()
         ClipboardHistory.shared.start()
         NewFilesWatcher.shared.start()
+        NotchScreenshotTap.shared.start()
     }
 }
 
