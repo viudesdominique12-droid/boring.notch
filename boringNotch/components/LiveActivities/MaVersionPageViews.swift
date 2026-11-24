@@ -352,7 +352,7 @@ struct AgendaPageContent: View {
             switch state {
             case .noAccess:
                 PageMessage(icon: "calendar.badge.exclamationmark", title: "Accès au calendrier",
-                            subtitle: "Autorise Boring Notch dans Réglages Système → Confidentialité")
+                            subtitle: "Clique ici pour l'autoriser")
             case .loaded(let items) where items.isEmpty:
                 PageMessage(icon: "calendar.badge.checkmark", title: "Rien de prévu",
                             subtitle: "Plus aucun événement aujourd'hui")

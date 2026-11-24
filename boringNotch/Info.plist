@@ -8,6 +8,10 @@
 	<string>Boring Notch</string>
 	<key>SUEnableAutomaticChecks</key>
 	<false/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Boring Notch affiche tes rendez-vous du jour dans l'encoche et te prévient 10 minutes avant.</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Boring Notch peut afficher tes rappels avec tes rendez-vous.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Boring Notch lit la batterie de tes écouteurs Bluetooth pour l'afficher dans l'encoche quand ils se connectent.</string>
 	<key>NSAudioCaptureUsageDescription</key>

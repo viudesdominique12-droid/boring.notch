@@ -282,10 +282,25 @@ private struct AgendaPage: View {
             AgendaPageContent(state: state(now: context.date), now: context.date)
         }
         .contentShape(Rectangle())
-        .onTapGesture { openCalendarApp() }
+        .onTapGesture {
+            if calendar.calendarAuthorizationStatus == .fullAccess { openCalendarApp() } else { askForAccess() }
+        }
         .task {
             await calendar.checkCalendarAuthorization()
             await calendar.updateCurrentDate(Date())
+        }
+    }
+
+    /// Not asked yet → the system prompt. Refused → the Calendars pane of
+    /// System Settings, where the switch is.
+    private func askForAccess() {
+        Task { @MainActor in
+            if EKEventStore.authorizationStatus(for: .event) == .notDetermined {
+                await calendar.checkCalendarAuthorization()
+                await calendar.updateCurrentDate(Date())
+            } else if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+                NSWorkspace.shared.open(url)
+            }
         }
     }
 
