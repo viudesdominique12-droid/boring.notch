@@ -18,12 +18,12 @@ enum NotchPage: String, CaseIterable, Identifiable {
     case music
     case weather
     case agenda
+    case batteries
     case timer
     case files
     case clipboard
     case shortcuts
     case system
-    case batteries
 
     var id: String { rawValue }
 
