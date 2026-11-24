@@ -61,6 +61,7 @@ jobs:
       # same identity, so macOS keeps the app's permissions across updates.
       # Without the secrets the app stays ad-hoc signed.
       - name: Sign with the fork's certificate
+        timeout-minutes: 5
         env:
           CERT_P12: ${{ secrets.MAC_CERT_P12 }}
           CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
@@ -72,10 +73,16 @@ jobs:
           security create-keychain -p "$KCPW" "$KC"
           security set-keychain-settings -lut 3600 "$KC"
           security unlock-keychain -p "$KCPW" "$KC"
-          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          # -A: any tool may use the key, so codesign never waits on a prompt.
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$CERT_PASSWORD" -f pkcs12 -A
           rm -f "$RUNNER_TEMP/cert.p12"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KCPW" "$KC" > /dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -k "$KCPW" "$KC" > /dev/null \
+            || echo "set-key-partition-list failed (continuing, the key is open to all tools)"
+          security find-identity -p codesigning "$KC" || true
           ID=$(security find-certificate -c "Boring Notch Ma Version" -Z "$KC" | awk '/SHA-1/{print $NF}')
+          echo "Signing identity: $ID"
+          [ -n "$ID" ]
           APP=$(ls -d build/Build/Products/Release/*.app | head -1)
           bash .github/scripts/resign-app.sh "$APP" "$ID" "$KC"
           security delete-keychain "$KC"
